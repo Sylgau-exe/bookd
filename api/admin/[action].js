@@ -8,7 +8,7 @@ import { sendMail } from '../../lib/mail.js';
 import { PACKAGES, priceFor, STATUSES } from '../../lib/pricing.js';
 import { buildLayout } from '../../lib/layout.js';
 import { buildPdfs } from '../../lib/pdf.js';
-import { savePublic, hasBlob } from '../../lib/storage.js';
+import { savePublic, removePublic, hasBlob } from '../../lib/storage.js';
 
 const token = () => crypto.randomBytes(24).toString('hex');
 const STATUS_KEYS = STATUSES.map(s => s[0]);
@@ -123,8 +123,12 @@ export default async function handler(req, res) {
         return res.json({ ok: true });
       }
       case 'order-delete': {
-        await q('DELETE FROM orders WHERE id=$1', [parseInt(body.id, 10)]);
-        await q('UPDATE messages SET order_id=NULL WHERE order_id=$1', [parseInt(body.id, 10)]);
+        const oid = parseInt(body.id, 10);
+        const files = [...(await q('SELECT url FROM photos WHERE order_id=$1', [oid])).map(r => r.url),
+          ...(await q('SELECT interior_url, cover_url FROM proofs WHERE order_id=$1', [oid])).flatMap(r => [r.interior_url, r.cover_url])].filter(Boolean);
+        await q('DELETE FROM orders WHERE id=$1', [oid]);
+        for (const f of files) await removePublic(f);
+        await q('UPDATE messages SET order_id=NULL WHERE order_id=$1', [oid]);
         return res.json({ ok: true });
       }
       case 'note': {

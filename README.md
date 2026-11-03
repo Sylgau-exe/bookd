@@ -1,4 +1,4 @@
-# BOOKD — v1.3
+# BOOKD — v1.4
 
 Public site (5 languages) + performer portal + admin back office (English).
 
@@ -38,3 +38,8 @@ Message or new order → **Email link to customer** → performer fills the port
 
 ## v1.3
 - Simpler admin access: one Sign in screen (email + password). The very first sign-in uses ADMIN_SETUP_KEY as the password and creates your account. Extra spaces are ignored.
+
+## v1.4
+- Deleting an order also deletes its stored photos and proof PDFs.
+- Admin photo thumbnails: larger, clearer Hide / Cover buttons.
+- Proof pages in the performer portal: sized for reading, no empty white half on the first spread.

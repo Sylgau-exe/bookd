@@ -77,14 +77,14 @@ main{padding:26px clamp(16px,3vw,36px);min-width:0}
 /* order sheet */
 .sheet{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px;align-items:start}
 @media (max-width:1100px){.sheet{grid-template-columns:1fr}}
-.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
 .th{position:relative;border-radius:6px;overflow:hidden;aspect-ratio:4/5;background:var(--bg);border:1px solid var(--rule)}
 .th img{width:100%;height:100%;object-fit:cover;display:block}
 .th.off img{opacity:.3}
 .th .tag{position:absolute;left:4px;top:4px;font-family:var(--mono);font-size:.62rem;padding:1px 5px;border-radius:4px;background:var(--warn);color:#fff}
 .th .tag.cv{background:var(--accent);left:auto;right:4px}
 .th .ops{position:absolute;inset:auto 0 0 0;display:flex;justify-content:space-between;background:linear-gradient(transparent,rgba(0,0,0,.65));padding:14px 4px 4px}
-.th .ops button{background:none;border:0;color:#fff;font-size:.68rem;cursor:pointer;padding:2px 4px}
+.th .ops button{background:none;border:0;color:#fff;font-size:.72rem;font-weight:600;cursor:pointer;padding:2px 4px;white-space:nowrap}
 .shoot-h{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin:14px 0 8px}
 .shoot-h:first-child{margin-top:0}
 .kv{display:grid;grid-template-columns:120px 1fr;gap:4px 10px;font-size:.88rem}
@@ -261,7 +261,7 @@ async function viewOrder(id) {
             <div class="small muted" style="margin-bottom:8px">${(s.credits || []).filter(c => c.value).map(c => `<b>${esc(c.label)}:</b> ${esc(c.value)}`).join(' · ') || 'No credits yet'}${s.story ? `<br><i>“${esc(s.story)}”</i>` : ''}</div>
             <div class="thumbs">${ph.map(p => `<div class="th ${p.keep === false ? 'off' : ''}"><a href="${esc(p.url)}" target="_blank" rel="noopener"><img src="${esc(p.url)}" alt="" loading="lazy"></a>
               ${p.low_res ? '<span class="tag" title="' + p.width + '×' + p.height + ' px">LOW RES</span>' : ''}${p.role === 'cover' ? '<span class="tag cv">COVER</span>' : ''}
-              <div class="ops"><button data-keep="${p.id}" data-v="${p.keep === false ? 1 : 0}">${p.keep === false ? 'Restore' : 'Leave out'}</button><button data-cover="${p.id}">Cover</button></div></div>`).join('') || '<span class="small muted">No photos.</span>'}</div></div>`;
+              <div class="ops"><button data-keep="${p.id}" data-v="${p.keep === false ? 1 : 0}">${p.keep === false ? 'Restore' : 'Hide'}</button><button data-cover="${p.id}">Cover</button></div></div>`).join('') || '<span class="small muted">No photos.</span>'}</div></div>`;
         }).join('') : '<div class="empty">The performer hasn’t added shoots yet. Send them the portal link.</div>'}
       </section>
       <section class="card stack">
@@ -324,7 +324,7 @@ async function viewOrder(id) {
     try { await post('order-update', body); toast('Saved'); reload(); } catch (err) { toast(err.message); }
   };
   $('#recalc').onclick = async () => { const f = new FormData($('#details')); await post('order-update', { id, package: f.get('package'), copies: f.get('copies'), recalcPrice: true }); toast('Price recalculated'); reload(); };
-  $('#del').onclick = () => openDialog(`<h2>Delete ${esc(o.ref)}?</h2><p>This removes the order, its shoots, photo records, proofs and timeline. This can’t be undone.</p>`, async () => { await post('order-delete', { id }); toast('Order deleted'); location.hash = 'orders'; });
+  $('#del').onclick = () => openDialog(`<h2>Delete ${esc(o.ref)}?</h2><p>This removes the order, its shoots, photos, proof PDFs and timeline, including the stored files. This can’t be undone.</p>`, async () => { await post('order-delete', { id }); toast('Order deleted'); location.hash = 'orders'; });
   $('#add-note').onclick = async () => { const t = $('#note').value.trim(); if (!t) return; await post('note', { id, text: t }); reload(); };
   $('#build').onclick = async () => {
     const b = $('#build'); b.disabled = true; b.textContent = 'Building PDFs…';

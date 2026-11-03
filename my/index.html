@@ -68,7 +68,8 @@ textarea{min-height:90px;resize:vertical}
 .drop{border:1.5px dashed var(--rule);border-radius:10px;padding:16px;text-align:center;color:var(--muted);cursor:pointer}
 .drop.over{border-color:var(--accent);background:var(--accent-soft)}
 /* proof spreads */
-.spread{display:grid;grid-template-columns:1fr 1fr;gap:0;box-shadow:0 20px 50px -30px rgba(0,0,0,.5);margin-bottom:22px}
+.spread{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:0 auto 22px;max-width:760px}
+.spread > .pg{box-shadow:0 20px 50px -30px rgba(0,0,0,.5)}
 .pg{aspect-ratio:8/10;background:var(--page);color:var(--page-ink);container-type:inline-size;position:relative;overflow:hidden;cursor:pointer}
 .pg.sel{outline:3px solid var(--accent);outline-offset:-3px}
 .pg .in{position:absolute;inset:8cqw;display:flex;flex-direction:column}
@@ -88,7 +89,7 @@ textarea{min-height:90px;resize:vertical}
 .pg .bio{font-size:3.1cqw;margin-top:4cqw}
 .pg.blank{background:repeating-linear-gradient(45deg,#E9E4DA 0 10px,#E2DCD0 10px 20px)}
 .pg.closing .in{align-items:center;justify-content:center;text-align:center;gap:3cqw}
-.cover-prev{max-width:300px}
+.cover-prev{max-width:260px}
 .comments{display:grid;gap:8px}
 .cm{background:var(--bg);border-radius:8px;padding:8px 12px;font-size:.9rem}
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:.9rem;z-index:50}
@@ -277,7 +278,7 @@ function paneProof() {
     <div class="row" style="justify-content:space-between"><h2>Your proof — version ${P.version}</h2><a class="btn ghost" href="${esc(P.interior_url)}" target="_blank" rel="noopener">Download PDF ↗</a></div>
     ${P.status === 'approved' ? `<div class="ok">You approved this proof. We’re sending it to print.</div>` : P.status === 'changes' ? `<div class="warn">You asked for changes. We’ll send you a new version soon.</div>` : `<p class="muted">Flip through your book below. Tap a page to comment on it. When you’re happy, approve it at the bottom. Nothing is printed before you approve.</p>`}
     ${L.cover ? `<div><div class="eyebrow" style="margin-bottom:6px">Cover</div><div class="pg cover-prev" style="cursor:default"><img class="full" src="${esc(L.cover.url)}" alt=""><div class="in" style="justify-content:flex-end;color:#fff"><div class="ttl" style="font-size:10cqw">${esc(L.cover.name)}</div><div class="kind" style="color:#fff">${esc(L.cover.role)}</div></div></div></div>` : ''}
-    <div id="spreads">${spreads.map(([a, b], i) => `<div class="spread">${a ? pageHtml(a, pages.indexOf(a)) : '<div></div>'}${b ? pageHtml(b, pages.indexOf(b)) : '<div></div>'}</div>`).join('')}</div>
+    <div id="spreads">${spreads.map(([a, b], i) => `<div class="spread">${a ? pageHtml(a, pages.indexOf(a)) : '<div aria-hidden="true"></div>'}${b ? pageHtml(b, pages.indexOf(b)) : '<div aria-hidden="true"></div>'}</div>`).join('')}</div>
     ${open ? `<div class="card" style="background:var(--bg)" id="cbox"><h3>${selPage ? 'Comment on page ' + selPage : 'General comment'}</h3><textarea id="ctext" placeholder="What should we change?"></textarea><div class="row"><button class="btn" id="csend">Add comment</button>${selPage ? '<button class="btn ghost" id="cgen">Make it a general comment</button>' : ''}</div></div>` : ''}
     ${D.comments.length ? `<div class="comments"><h3>Comments</h3>${D.comments.map(c => `<div class="cm">${c.page ? `<b>Page ${c.page}:</b> ` : ''}${esc(c.body)}</div>`).join('')}</div>` : ''}
     ${open ? `<div class="card" style="background:var(--bg)"><h3>Your decision</h3>
