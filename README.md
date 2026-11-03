@@ -1,4 +1,4 @@
-# BOOKD — v1.4
+# BOOKD — v1.7
 
 Public site (5 languages) + performer portal + admin back office (English).
 
@@ -43,3 +43,15 @@ Message or new order → **Email link to customer** → performer fills the port
 - Deleting an order also deletes its stored photos and proof PDFs.
 - Admin photo thumbnails: larger, clearer Hide / Cover buttons.
 - Proof pages in the performer portal: sized for reading, no empty white half on the first spread.
+
+## v1.5
+- Actor sample book (Raphaël Vachon): new film-set, stage and "Transformations" photos replace the earlier drafts; the Transformations shoot now has 3 photos.
+
+## v1.6
+- "Who it's for": Photographers and Agencies added in all 5 languages (also in the contact form), with a line on offering the book to clients or a roster at volume pricing.
+
+## v1.7
+- Full re-test of the public site in all 5 languages, the back office and the performer portal.
+- Spanish, Portuguese and Italian versions of the last two untranslated shoot titles.
+- Screen-reader labels (book arrows, language menu, 3D books) translated into all 5 languages.
+- First admin sign-in on a brand-new database no longer fails if two requests arrive at once.

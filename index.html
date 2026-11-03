@@ -342,8 +342,8 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
       <a href="#faq" data-i18n="nav_faq"></a>
       <a href="#contact" data-i18n="nav_contact"></a>
     </nav>
-    <label class="lang"><span class="sr">Language</span>
-      <select id="lang-select" aria-label="Language">
+    <label class="lang"><span class="sr" data-aria-text="Language">Language</span>
+      <select id="lang-select" aria-label="Language" data-aria="Language">
         <option value="fr">Français</option><option value="en">English</option><option value="es">Español</option><option value="pt">Português</option><option value="it">Italiano</option>
       </select>
     </label>
@@ -380,14 +380,14 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
         <p data-i18n="sample_lede"></p>
       </div>
       <div class="viewer">
-        <div class="tabs" role="tablist" id="book-tabs" aria-label="Sample books"></div>
+        <div class="tabs" role="tablist" id="book-tabs" aria-label="Sample books" data-aria="Sample books"></div>
         <div class="book" id="book"><div class="board" aria-hidden="true"></div><div class="stack l" aria-hidden="true"></div><div class="stack r" aria-hidden="true"></div><div class="spread" id="spread" aria-live="polite"></div></div>
         <div class="vbar">
           <div class="where" id="where"></div>
           <div class="dots" id="dots" aria-hidden="true"></div>
           <div class="pager">
-            <button type="button" id="prev" aria-label="Previous spread">←</button>
-            <button type="button" id="next" aria-label="Next spread">→</button>
+            <button type="button" id="prev" aria-label="Previous spread" data-aria="Previous spread">←</button>
+            <button type="button" id="next" aria-label="Next spread" data-aria="Next spread">→</button>
           </div>
         </div>
         <p class="note" id="sample-note"></p>
@@ -410,7 +410,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
       </div>
       <div class="duo">
         <figure class="prod-item">
-          <div class="scene" role="img" aria-label="Hardcover BOOKD book">
+          <div class="scene" role="img" aria-label="Hardcover BOOKD book" data-aria="Hardcover BOOKD book">
             <div class="floor-shadow"></div>
             <div class="b3d hard">
               <div class="f front"><img src="images/F-cover.jpg" alt=""><span class="cv-brand">BOOKD</span><span class="cv-name">Maëlle<br>Duret</span></div>
@@ -420,7 +420,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
           <figcaption><b data-i18n="pr_hard_t"></b><span data-i18n="pr_hard"></span></figcaption>
         </figure>
         <figure class="prod-item">
-          <div class="scene" role="img" aria-label="Softcover BOOKD book">
+          <div class="scene" role="img" aria-label="Softcover BOOKD book" data-aria="Softcover BOOKD book">
             <div class="floor-shadow"></div>
             <div class="b3d soft">
               <div class="f front"><img src="images/M-cover.jpg" alt=""><span class="cv-brand">BOOKD</span><span class="cv-name">Elias<br>Novak</span></div>
@@ -521,7 +521,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
       </div>
       <form id="inq" novalidate>
         <div class="f full">
-          <span class="seg" role="radiogroup" aria-label="Type">
+          <span class="seg" role="radiogroup" aria-label="Type" data-aria="Type">
             <label for="t-q"><input type="radio" name="type" id="t-q" value="question" checked><span data-i18n="f_question"></span></label>
             <label for="t-r"><input type="radio" name="type" id="t-r" value="reservation"><span data-i18n="f_reservation"></span></label>
           </span>
@@ -869,8 +869,8 @@ const BOOKS = [
   bio:{fr:"Vingt ans de scène, et toujours le trac avant d'entrer.",en:"Twenty years on stage, and still nervous before every entrance.",es:"Veinte años en escena, y todavía con nervios antes de cada entrada.",pt:"Vinte anos de palco, e ainda nervoso antes de cada entrada.",it:"Vent'anni di palcoscenico, e ancora l'emozione prima di ogni entrata."},
   facts:[["k_lang",{fr:"Français, anglais",en:"French, English",es:"Francés, inglés",pt:"Francês, inglês",it:"Francese, inglese"}],["k_union","UDA · ACTRA"],["k_agency",{fr:"Représentation à venir",en:"Representation pending",es:"Representación en curso",pt:"Agenciamento em andamento",it:"Rappresentanza in arrivo"}]],
   shoots:[
-   {kind:"k_headshots",tone:"headshot",n:3,title:{fr:"Headshots",en:"Headshots"},credits:[["k_ph","Nadia Fortin"],["k_mua","Claire Dubé"],["k_loc",{fr:"Studio Saint-Henri, Montréal",en:"Saint-Henri studio, Montreal",es:"Estudio Saint-Henri, Montreal",pt:"Estúdio Saint-Henri, Montreal",it:"Studio Saint-Henri, Montréal"}],["k_date",{fr:"Janvier 2026",en:"January 2026",es:"Enero de 2026",pt:"Janeiro de 2026",it:"Gennaio 2026"}]],story:{fr:"Un look commercial, un look dramatique. Nadia m'a fait passer du rire aux larmes en vingt minutes.",en:"One commercial look, one dramatic look. Nadia took me from laughter to tears in twenty minutes.",es:"Un look comercial, un look dramático. Nadia me llevó de la risa a las lágrimas en veinte minutos.",pt:"Um visual comercial, um visual dramático. A Nadia me levou do riso às lágrimas em vinte minutos.",it:"Un look commerciale, un look drammatico. Nadia mi ha portato dalle risate alle lacrime in venti minuti."}},
-   {kind:"k_set",tone:"noir",n:3,title:{fr:"« Les Heures bleues »",en:"\"Les Heures bleues\""},credits:[["k_ph",{fr:"Ana Ruiz, photo de plateau",en:"Ana Ruiz, set stills",es:"Ana Ruiz, foto fija de rodaje",pt:"Ana Ruiz, still de set",it:"Ana Ruiz, foto di scena"}],["k_prod","Films du Fleuve"],["k_role",{fr:"Inspecteur Lavoie",en:"Inspector Lavoie",es:"Inspector Lavoie",pt:"Inspetor Lavoie",it:"Ispettore Lavoie"}],["k_loc",{fr:"Vieux-Montréal, tournage de nuit",en:"Old Montreal, night shoot",es:"Viejo Montreal, rodaje nocturno",pt:"Velha Montreal, filmagem noturna",it:"Vecchia Montréal, riprese notturne"}],["k_date",{fr:"Juin 2026",en:"June 2026",es:"Junio de 2026",pt:"Junho de 2026",it:"Giugno 2026"}]],story:{fr:"Une scène d'interrogatoire tournée quatorze fois. À la dernière prise, toute l'équipe s'est tue.",en:"An interrogation scene shot fourteen times. On the last take, the whole crew went silent.",es:"Una escena de interrogatorio rodada catorce veces. En la última toma, todo el equipo se quedó en silencio.",pt:"Uma cena de interrogatório filmada catorze vezes. Na última tomada, a equipe inteira ficou em silêncio.",it:"Una scena d'interrogatorio girata quattordici volte. All'ultimo ciak, tutta la troupe è rimasta in silenzio."}},
+   {kind:"k_headshots",tone:"headshot",n:3,title:{fr:"Headshots",en:"Headshots",es:"Headshots",pt:"Headshots",it:"Headshots"},credits:[["k_ph","Nadia Fortin"],["k_mua","Claire Dubé"],["k_loc",{fr:"Studio Saint-Henri, Montréal",en:"Saint-Henri studio, Montreal",es:"Estudio Saint-Henri, Montreal",pt:"Estúdio Saint-Henri, Montreal",it:"Studio Saint-Henri, Montréal"}],["k_date",{fr:"Janvier 2026",en:"January 2026",es:"Enero de 2026",pt:"Janeiro de 2026",it:"Gennaio 2026"}]],story:{fr:"Un look commercial, un look dramatique. Nadia m'a fait passer du rire aux larmes en vingt minutes.",en:"One commercial look, one dramatic look. Nadia took me from laughter to tears in twenty minutes.",es:"Un look comercial, un look dramático. Nadia me llevó de la risa a las lágrimas en veinte minutos.",pt:"Um visual comercial, um visual dramático. A Nadia me levou do riso às lágrimas em vinte minutos.",it:"Un look commerciale, un look drammatico. Nadia mi ha portato dalle risate alle lacrime in venti minuti."}},
+   {kind:"k_set",tone:"noir",n:3,title:{fr:"« Les Heures bleues »",en:"\"Les Heures bleues\"",es:"«Les Heures bleues»",pt:"«Les Heures bleues»",it:"«Les Heures bleues»"},credits:[["k_ph",{fr:"Ana Ruiz, photo de plateau",en:"Ana Ruiz, set stills",es:"Ana Ruiz, foto fija de rodaje",pt:"Ana Ruiz, still de set",it:"Ana Ruiz, foto di scena"}],["k_prod","Films du Fleuve"],["k_role",{fr:"Inspecteur Lavoie",en:"Inspector Lavoie",es:"Inspector Lavoie",pt:"Inspetor Lavoie",it:"Ispettore Lavoie"}],["k_loc",{fr:"Vieux-Montréal, tournage de nuit",en:"Old Montreal, night shoot",es:"Viejo Montreal, rodaje nocturno",pt:"Velha Montreal, filmagem noturna",it:"Vecchia Montréal, riprese notturne"}],["k_date",{fr:"Juin 2026",en:"June 2026",es:"Junio de 2026",pt:"Junho de 2026",it:"Giugno 2026"}]],story:{fr:"Une scène d'interrogatoire tournée quatorze fois. À la dernière prise, toute l'équipe s'est tue.",en:"An interrogation scene shot fourteen times. On the last take, the whole crew went silent.",es:"Una escena de interrogatorio rodada catorce veces. En la última toma, todo el equipo se quedó en silencio.",pt:"Uma cena de interrogatório filmada catorze vezes. Na última tomada, a equipe inteira ficou em silêncio.",it:"Una scena d'interrogatorio girata quattordici volte. All'ultimo ciak, tutta la troupe è rimasta in silenzio."}},
    {kind:"k_stage",tone:"stage",n:1,title:{fr:"« Le Gardien du phare »",en:"\"The Lighthouse Keeper\"",es:"«El guardián del faro»",pt:"«O guardião do farol»",it:"«Il guardiano del faro»"},credits:[["k_ph",{fr:"Louis-Simon Roy, photo de production",en:"Louis-Simon Roy, production stills",es:"Louis-Simon Roy, foto de producción",pt:"Louis-Simon Roy, fotos de produção",it:"Louis-Simon Roy, foto di produzione"}],["k_prod","Théâtre de la Marée"],["k_role",{fr:"Le gardien",en:"The keeper",es:"El guardián",pt:"O guardião",it:"Il guardiano"}],["k_loc","Montréal"],["k_date",{fr:"Octobre 2026",en:"October 2026",es:"Octubre de 2026",pt:"Outubro de 2026",it:"Ottobre 2026"}]],story:{fr:"Quatre-vingt-dix minutes seul en scène. Le soir de la première, j'ai oublié une réplique et personne ne l'a vu.",en:"Ninety minutes alone on stage. On opening night I forgot a line and nobody noticed.",es:"Noventa minutos solo en escena. La noche del estreno olvidé una frase y nadie se dio cuenta.",pt:"Noventa minutos sozinho no palco. Na noite de estreia esqueci uma fala e ninguém percebeu.",it:"Novanta minuti da solo in scena. La sera della prima ho dimenticato una battuta e nessuno se n'è accorto."}},
    {kind:"k_roles",tone:"warm",n:3,title:{fr:"« Transformations »",en:"\"Transformations\"",es:"«Transformaciones»",pt:"«Transformações»",it:"«Trasformazioni»"},credits:[["k_ph","Nadia Fortin"],["k_sfx","Mélanie Caron"],["k_role",{fr:"Boxeur, film « Dernier round » · Soldat, série « Horizon 9 »",en:"Boxer, film \"Last Round\" · Soldier, series \"Horizon 9\"",es:"Boxeador, película «Último asalto» · Soldado, serie «Horizonte 9»",pt:"Boxeador, filme «Último round» · Soldado, série «Horizonte 9»",it:"Pugile, film «Ultimo round» · Soldato, serie «Orizzonte 9»"}],["k_loc",{fr:"Studio Saint-Henri, Montréal",en:"Saint-Henri studio, Montreal",es:"Estudio Saint-Henri, Montreal",pt:"Estúdio Saint-Henri, Montreal",it:"Studio Saint-Henri, Montréal"}],["k_date",{fr:"Août 2026",en:"August 2026",es:"Agosto de 2026",pt:"Agosto de 2026",it:"Agosto 2026"}]],story:{fr:"Une heure de maquillage pour un œil au beurre noir. En sortant du studio, la caissière du dépanneur m'a demandé si ça allait.",en:"An hour of makeup for a black eye. On my way out, the cashier at the corner store asked if I was okay.",es:"Una hora de maquillaje para un ojo morado. Al salir, la cajera de la tienda de la esquina me preguntó si estaba bien.",pt:"Uma hora de maquiagem para um olho roxo. Na saída, a caixa da loja da esquina me perguntou se eu estava bem.",it:"Un'ora di trucco per un occhio nero. Uscendo, la cassiera del negozio all'angolo mi ha chiesto se stavo bene."}}]}
 ];
@@ -1019,9 +1019,12 @@ function updateEstimate(){
 document.getElementById("est-pkg").addEventListener("change", e => { estPkg = e.target.value; updateEstimate(); });
 document.getElementById("est-region").addEventListener("change", e => { estRegion = +e.target.value; updateEstimate(); });
 document.getElementById("est-qty").addEventListener("input", e => { estQty = parseInt(e.target.value, 10) || 1; updateEstimate(); });
+const ARIA = {"Language": {"fr": "Langue", "en": "Language", "es": "Idioma", "pt": "Idioma", "it": "Lingua"}, "Sample books": {"fr": "Books exemples", "en": "Sample books", "es": "Libros de ejemplo", "pt": "Livros de exemplo", "it": "Book di esempio"}, "Previous spread": {"fr": "Planche précédente", "en": "Previous spread", "es": "Página doble anterior", "pt": "Página dupla anterior", "it": "Doppia pagina precedente"}, "Next spread": {"fr": "Planche suivante", "en": "Next spread", "es": "Página doble siguiente", "pt": "Página dupla seguinte", "it": "Doppia pagina successiva"}, "Hardcover BOOKD book": {"fr": "Book BOOKD couverture rigide", "en": "Hardcover BOOKD book", "es": "Libro BOOKD de tapa dura", "pt": "Livro BOOKD de capa dura", "it": "Book BOOKD con copertina rigida"}, "Softcover BOOKD book": {"fr": "Book BOOKD couverture souple", "en": "Softcover BOOKD book", "es": "Libro BOOKD de tapa blanda", "pt": "Livro BOOKD de capa mole", "it": "Book BOOKD con copertina morbida"}, "Type": {"fr": "Type", "en": "Type", "es": "Tipo", "pt": "Tipo", "it": "Tipo"}};
 function applyLang(){
   const t = T[lang];
   document.documentElement.lang = lang;
+  document.querySelectorAll("[data-aria]").forEach(el => el.setAttribute("aria-label", ARIA[el.dataset.aria][lang]));
+  document.querySelectorAll("[data-aria-text]").forEach(el => el.textContent = ARIA[el.dataset.ariaText][lang]);
   document.querySelectorAll("[data-i18n]").forEach(el => { const v = t[el.dataset.i18n] ?? T.en[el.dataset.i18n]; if (typeof v === "string") el.innerHTML = v; });
   document.getElementById("lang-select").value = lang;
   document.getElementById("who-grid").innerHTML = t.who.map(w => `<span class="chip">${w}</span>`).join("");
