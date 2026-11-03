@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>My BOOKD</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2315161B'/%3E%3Ctext x='32' y='45' font-family='Georgia,serif' font-size='38' font-style='italic' text-anchor='middle' fill='%23FF5A7E'%3ED%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..600;1,6..96,400..600&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<script>
+window.onerror = function (m, s, l) { console.error('Portal error:', m, s, l); return false; };
+window.onunhandledrejection = function (e) { console.error('Portal promise:', e.reason); };
+</script>
+<style>
+/* Layout: a calm, guided workspace — four numbered steps (they are a real sequence), one card per step, photo grids per shoot, and the proof as page spreads. */
+:root{--bg:#F4F5F7;--surface:#FFFFFF;--ink:#15161B;--muted:#5B5E68;--rule:#E1E3E8;--accent:#B0123B;--accent-soft:rgba(176,18,59,.08);--on-accent:#fff;--warn:#A15C00;--warn-soft:rgba(161,92,0,.1);--good:#1F7A4D;--good-soft:rgba(31,122,77,.1);
+--page:#FBFBFA;--page-ink:#17181C;--page-muted:#6A6C73;
+--display:"Bodoni Moda",Georgia,serif;--body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"JetBrains Mono",ui-monospace,Menlo,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101115;--surface:#191B21;--ink:#ECEDF1;--muted:#A3A6B0;--rule:#2B2E37;--accent:#FF5A7E;--accent-soft:rgba(255,90,126,.12);--on-accent:#1A0710;--warn:#F0B35A;--warn-soft:rgba(240,179,90,.12);--good:#4FCB8C;--good-soft:rgba(79,203,140,.12);color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+[hidden]{display:none!important}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:980px;margin:0 auto;padding-block:24px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:22px}
+.mark{font-family:var(--display);font-size:1.5rem;font-weight:600;letter-spacing:.06em}.mark i{color:var(--accent)}
+.eyebrow{font-family:var(--mono);font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+h1,h2,h3{font-family:var(--display);font-weight:500;margin:0;line-height:1.15}
+h1{font-size:clamp(1.8rem,4vw,2.5rem)}h2{font-size:1.4rem}h3{font-size:1.1rem}
+.muted{color:var(--muted)}.small{font-size:.84rem}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:20px 0}
+.steps a{border:1px solid var(--rule);background:var(--surface);border-radius:10px;padding:10px 12px;text-decoration:none;color:var(--muted);display:grid;gap:2px}
+.steps a b{font-family:var(--mono);font-size:.78rem;color:var(--accent);font-weight:500}
+.steps a.on{border-color:var(--ink);color:var(--ink)}
+.steps a.done b::after{content:" ✓";color:var(--good)}
+@media (max-width:640px){.steps{grid-template-columns:1fr 1fr}}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:20px;display:grid;gap:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:640px){.grid2{grid-template-columns:1fr}}
+label{display:grid;gap:4px;font-size:.8rem;color:var(--muted)}
+label.chk{display:flex;gap:8px;align-items:flex-start;font-size:.92rem;color:var(--ink)}
+label.chk input{width:auto;margin-top:4px}
+input,select,textarea{background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:9px 11px;width:100%}
+textarea{min-height:90px;resize:vertical}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--rule);background:var(--surface);border-radius:999px;padding:9px 18px;cursor:pointer;font-weight:600;text-decoration:none;white-space:nowrap}
+.btn:hover{border-color:var(--ink)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.ghost{border-color:transparent;background:none;color:var(--muted);font-weight:500}
+.btn:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.note{border-left:3px solid var(--accent);background:var(--accent-soft);padding:10px 14px;border-radius:0 8px 8px 0;font-size:.92rem}
+.warn{background:var(--warn-soft);color:var(--warn);border-radius:8px;padding:10px 12px;font-size:.9rem}
+.ok{background:var(--good-soft);color:var(--good);border-radius:8px;padding:10px 12px;font-size:.92rem}
+.shoot{border:1px solid var(--rule);border-radius:10px;padding:14px;display:grid;gap:12px}
+.credits{display:grid;gap:8px}
+.cr{display:grid;grid-template-columns:150px 1fr auto;gap:8px}
+@media (max-width:640px){.cr{grid-template-columns:1fr 1fr auto}}
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
+.th{position:relative;border-radius:8px;overflow:hidden;aspect-ratio:4/5;background:var(--bg);border:1px solid var(--rule)}
+.th img{width:100%;height:100%;object-fit:cover;display:block}
+.th .tag{position:absolute;left:5px;top:5px;font-family:var(--mono);font-size:.62rem;padding:2px 6px;border-radius:4px;background:var(--warn);color:#fff}
+.th .tag.cv{left:auto;right:5px;background:var(--accent)}
+.th .ops{position:absolute;inset:auto 0 0;display:flex;justify-content:space-between;background:linear-gradient(transparent,rgba(0,0,0,.7));padding:16px 4px 4px}
+.th .ops button{background:none;border:0;color:#fff;font-size:.72rem;cursor:pointer;padding:3px 5px}
+.th.up{display:grid;place-items:center;font-size:.8rem;color:var(--muted);text-align:center;padding:8px}
+.drop{border:1.5px dashed var(--rule);border-radius:10px;padding:16px;text-align:center;color:var(--muted);cursor:pointer}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+/* proof spreads */
+.spread{display:grid;grid-template-columns:1fr 1fr;gap:0;box-shadow:0 20px 50px -30px rgba(0,0,0,.5);margin-bottom:22px}
+.pg{aspect-ratio:8/10;background:var(--page);color:var(--page-ink);container-type:inline-size;position:relative;overflow:hidden;cursor:pointer}
+.pg.sel{outline:3px solid var(--accent);outline-offset:-3px}
+.pg .in{position:absolute;inset:8cqw;display:flex;flex-direction:column}
+.pg img.full{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.pg img.framed{position:absolute;inset:10cqw 10cqw 14cqw;width:80cqw;height:calc(100% - 24cqw);object-fit:contain}
+.pg .fol{position:absolute;bottom:3cqw;font-family:var(--mono);font-size:2.4cqw;color:var(--page-muted)}
+.pg .fol.l{left:5cqw}.pg .fol.r{right:5cqw}
+.pg .lr{position:absolute;top:3cqw;left:3cqw;font-family:var(--mono);font-size:2.4cqw;background:var(--warn);color:#fff;padding:.5cqw 1.5cqw;border-radius:1cqw}
+.pg .cnt{position:absolute;top:3cqw;right:3cqw;font-family:var(--mono);font-size:2.4cqw;background:var(--accent);color:#fff;padding:.5cqw 1.5cqw;border-radius:5cqw}
+.pg .num{font-family:var(--display);font-style:italic;font-size:20cqw;line-height:.8;color:var(--accent)}
+.pg .kind{font-family:var(--mono);font-size:2.4cqw;letter-spacing:.16em;text-transform:uppercase;color:var(--page-muted);margin-top:4cqw}
+.pg .ttl{font-family:var(--display);font-size:6.5cqw;line-height:1.05;margin-top:1.5cqw}
+.pg dl{display:grid;grid-template-columns:auto 1fr;gap:1.2cqw 4cqw;margin:5cqw 0 0;font-size:2.9cqw}
+.pg dt{font-family:var(--mono);font-size:2.3cqw;letter-spacing:.12em;color:var(--page-muted);text-transform:uppercase;padding-top:.4cqw}
+.pg dd{margin:0}
+.pg .story{margin-top:auto;border-top:.3cqw solid var(--page-ink);padding-top:3cqw;font-family:var(--display);font-style:italic;font-size:3.6cqw;line-height:1.35}
+.pg .bio{font-size:3.1cqw;margin-top:4cqw}
+.pg.blank{background:repeating-linear-gradient(45deg,#E9E4DA 0 10px,#E2DCD0 10px 20px)}
+.pg.closing .in{align-items:center;justify-content:center;text-align:center;gap:3cqw}
+.cover-prev{max-width:300px}
+.comments{display:grid;gap:8px}
+.cm{background:var(--bg);border-radius:8px;padding:8px 12px;font-size:.9rem}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:.9rem;z-index:50}
+.center{min-height:70vh;display:grid;place-items:center;text-align:center}
+</style>
+</head>
+<body>
+<div id="toast" hidden></div>
+<div class="wrap">
+  <header class="top"><span class="mark">BOOK<i>D</i></span><span class="small muted" id="ref"></span></header>
+  <div id="root"><div class="center muted">Loading your book…</div></div>
+</div>
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const T = new URLSearchParams(location.search).get('t') || '';
+let D = null, step = 'about', selPage = null;
+function toast(t) { const el = $('#toast'); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => el.hidden = true, 2600); }
+async function api(action, body, opts = {}) {
+  const r = await fetch(`/api/portal/${action}?t=${encodeURIComponent(T)}${opts.query || ''}`, { method: body || opts.raw ? 'POST' : 'GET', headers: opts.headers || { 'Content-Type': 'application/json' }, body: opts.raw || (body ? JSON.stringify(body) : undefined) });
+  let j = {}; try { j = await r.json(); } catch {}
+  if (!r.ok || j.ok === false) throw new Error(j.error || 'Something went wrong (' + r.status + ')');
+  return j;
+}
+async function load() {
+  try { D = await api('get'); } catch (e) { $('#root').innerHTML = `<div class="center"><div><h2>We can’t open this book</h2><p class="muted">${esc(e.message)}</p></div></div>`; return; }
+  $('#ref').textContent = `${D.order.ref} · ${D.order.packageLabel} · up to ${D.order.maxPhotos} photos`;
+  if (location.hash === '#proof' && D.proof) step = 'proof';
+  render();
+}
+function stepsDone() {
+  const pf = D.order.profile, sh = D.order.ship;
+  return { about: !!(pf.name && pf.bio), ship: !!(sh.ship_address && sh.ship_country), shoots: D.photos.length > 0 && !!D.order.submitted_at, proof: D.proof?.status === 'approved' };
+}
+function render() {
+  const done = stepsDone();
+  const names = [['about', 'About you'], ['ship', 'Shipping'], ['shoots', 'Shoots & photos'], ['proof', 'Your proof']];
+  $('#root').innerHTML = `
+    <h1>${esc(D.order.profile.name || D.order.customer_name || 'Your book')}</h1>
+    <p class="muted">Your BOOKD in four steps. Everything saves as you go, so you can come back to this page any time with the same link.</p>
+    ${D.order.locked ? `<div class="ok">Your book is approved and in production. Thank you!</div>` : ''}
+    <nav class="steps">${names.map(([k, l], i) => `<a href="#${k}" data-step="${k}" class="${step === k ? 'on' : ''} ${done[k] ? 'done' : ''}"><b>0${i + 1}</b>${l}</a>`).join('')}</nav>
+    <section id="pane"></section>`;
+  $('.steps').onclick = e => { const a = e.target.closest('a[data-step]'); if (!a) return; e.preventDefault(); step = a.dataset.step; render(); };
+  ({ about: paneAbout, ship: paneShip, shoots: paneShoots, proof: paneProof })[step]();
+}
+const dis = () => D.order.locked ? 'disabled' : '';
+
+/* 01 about */
+function paneAbout() {
+  const p = D.order.profile;
+  $('#pane').innerHTML = `<form class="card" id="f">
+    <h2>About you</h2><p class="small muted">This becomes the first page of your book, facing your best smile.</p>
+    <div class="grid2"><label>Name as printed in the book<input name="name" value="${esc(p.name || D.order.customer_name)}" ${dis()}></label><label>Discipline line (e.g. Model · Fashion and beauty)<input name="role" value="${esc(p.role)}" ${dis()}></label></div>
+    <label>Short bio (2–3 sentences)<textarea name="bio" maxlength="1200" ${dis()}>${esc(p.bio)}</textarea></label>
+    <div class="grid2"><label>Height (optional)<input name="height" value="${esc(p.height)}" ${dis()}></label><label>Languages<input name="languages" value="${esc(p.languages)}" ${dis()}></label></div>
+    <div class="grid2"><label>Agency (optional)<input name="agency" value="${esc(p.agency)}" ${dis()}></label><label>Based in<input name="city" value="${esc(p.city)}" ${dis()}></label></div>
+    <div class="grid2"><label>Contact line for the last page (email or agent)<input name="contact" value="${esc(p.contact)}" ${dis()}></label><label>Website or Instagram<input name="website" value="${esc(p.website)}" ${dis()}></label></div>
+    <div class="row"><button class="btn primary" ${dis()}>Save and continue</button></div></form>`;
+  $('#f').onsubmit = async e => { e.preventDefault(); await api('profile', { profile: Object.fromEntries(new FormData(e.target)) }); D.order.profile = { ...D.order.profile, ...Object.fromEntries(new FormData(e.target)) }; toast('Saved'); step = 'ship'; render(); };
+}
+/* 02 shipping */
+function paneShip() {
+  const s = D.order.ship;
+  $('#pane').innerHTML = `<form class="card" id="f">
+    <h2>Where should we ship your book?</h2>
+    <div class="grid2"><label>Full name<input name="ship_name" value="${esc(s.ship_name)}" ${dis()}></label><label>Phone (for the courier)<input name="phone" value="${esc(s.phone)}" ${dis()}></label></div>
+    <label>Street address<input name="ship_address" value="${esc(s.ship_address)}" ${dis()}></label>
+    <div class="grid2"><label>City<input name="ship_city" value="${esc(s.ship_city)}" ${dis()}></label><label>State / province<input name="ship_region" value="${esc(s.ship_region)}" ${dis()}></label></div>
+    <div class="grid2"><label>Postal code<input name="ship_postal" value="${esc(s.ship_postal)}" ${dis()}></label><label>Country<input name="ship_country" value="${esc(s.ship_country)}" ${dis()}></label></div>
+    <div class="row"><button class="btn primary" ${dis()}>Save and continue</button></div></form>`;
+  $('#f').onsubmit = async e => { e.preventDefault(); const ship = Object.fromEntries(new FormData(e.target)); await api('profile', { ship }); D.order.ship = { ...D.order.ship, ...ship }; toast('Saved'); step = 'shoots'; render(); };
+}
+/* 03 shoots */
+const CREDIT_DEFAULTS = ['Photographer', 'Makeup', 'Hair', 'Styling', 'Location', 'Date'];
+function paneShoots() {
+  const kept = D.photos.length;
+  $('#pane').innerHTML = `<div class="card">
+    <div class="row" style="justify-content:space-between"><h2>Shoots & photos</h2><span class="small muted">${kept} / ${D.order.maxPhotos} photos</span></div>
+    <div class="note">Add one section per shoot, show or event: who took part, where and when, and a few words about that day. Then add the photos. Runway, on-set and stage photos are welcome. Photos that are too small for a full page get a <b>LOW RES</b> badge and a smaller frame in the book; you decide at the proof whether they stay.</div>
+    <p class="small muted">Use the original files (JPG or PNG), not screenshots. Tap “Cover” on the photo you want on the front of your book.</p>
+    <div id="shoots" style="display:grid;gap:14px"></div>
+    <div class="row"><button class="btn" id="add-shoot" ${dis()}>+ Add a shoot</button></div>
+    ${kept > D.order.maxPhotos ? `<div class="warn">You have more photos than your package includes (${D.order.maxPhotos}). We’ll ask you which to leave out, or you can upgrade your package.</div>` : ''}
+    <hr style="border:0;border-top:1px solid var(--rule);width:100%">
+    <div class="row" style="justify-content:space-between"><span class="small muted">${D.order.submitted_at ? 'Sent for layout ✓ You can still add or change photos until we send your proof.' : 'When everything is in, send it to us. We’ll lay out your book and send you a proof to approve.'}</span>
+    <button class="btn primary" id="submit" ${dis()} ${kept ? '' : 'disabled'}>${D.order.submitted_at ? 'Send again' : 'Send for layout'}</button></div></div>`;
+  const wrap = $('#shoots');
+  if (!D.shoots.length) wrap.innerHTML = `<p class="muted">No shoots yet. Start with your strongest one.</p>`;
+  D.shoots.forEach(s => wrap.appendChild(shootCard(s)));
+  $('#add-shoot').onclick = async () => {
+    const r = await api('shoot-save', { kind: 'editorial', title: '', credits: CREDIT_DEFAULTS.map(l => ({ label: l, value: '' })), story: '' });
+    D.shoots.push({ id: r.id, kind: 'editorial', title: '', credits: CREDIT_DEFAULTS.map(l => ({ label: l, value: '' })), story: '' }); render();
+  };
+  $('#submit').onclick = async () => { try { await api('submit', {}); toast('Sent — thank you!'); D.order.submitted_at = new Date().toISOString(); render(); } catch (e) { toast(e.message); } };
+}
+function shootCard(s) {
+  const el = document.createElement('div'); el.className = 'shoot';
+  const ph = D.photos.filter(p => p.shoot_id === s.id);
+  const credits = (s.credits && s.credits.length ? s.credits : CREDIT_DEFAULTS.map(l => ({ label: l, value: '' })));
+  el.innerHTML = `
+    <div class="grid2"><label>Type<select name="kind" ${dis()}>${Object.entries(D.kinds).map(([k, l]) => `<option value="${k}" ${k === s.kind ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+    <label>Title (e.g. “Rose Bonbon” or the show’s name)<input name="title" value="${esc(s.title)}" ${dis()}></label></div>
+    <div><div class="small muted" style="margin-bottom:6px">Credits</div><div class="credits">${credits.map(c => `<div class="cr"><input data-cl value="${esc(c.label)}" placeholder="Role" ${dis()}><input data-cv value="${esc(c.value)}" placeholder="Name / detail" ${dis()}><button class="btn ghost" data-rmcr type="button" ${dis()}>✕</button></div>`).join('')}</div>
+    <button class="btn ghost small" data-addcr type="button" ${dis()}>+ Add a credit</button></div>
+    <label>The story — fun, difficult, demanding? A few words about that day<textarea name="story" maxlength="800" ${dis()}>${esc(s.story)}</textarea></label>
+    <div class="thumbs">${ph.map(p => `<div class="th"><img src="${esc(p.url)}" alt="" loading="lazy">${p.low_res ? '<span class="tag">LOW RES</span>' : ''}${p.role === 'cover' ? '<span class="tag cv">COVER</span>' : ''}
+      ${D.order.locked ? '' : `<div class="ops"><button data-del="${p.id}" type="button">Remove</button><button data-cover="${p.id}" type="button">Cover</button></div>`}</div>`).join('')}<div class="up-slot"></div></div>
+    ${D.order.locked ? '' : `<label class="drop" tabindex="0"><input type="file" accept="image/jpeg,image/png" multiple hidden><span>Add photos — tap to choose, or drop them here</span></label>`}
+    <div class="row" style="justify-content:space-between"><button class="btn" data-save type="button" ${dis()}>Save this shoot</button><button class="btn ghost" data-delshoot type="button" ${dis()}>Delete shoot</button></div>`;
+  const collect = () => ({ id: s.id, kind: $('[name=kind]', el).value, title: $('[name=title]', el).value, story: $('[name=story]', el).value,
+    credits: [...el.querySelectorAll('.cr')].map(r => ({ label: $('[data-cl]', r).value, value: $('[data-cv]', r).value })) });
+  const save = async (quiet) => { const v = collect(); await api('shoot-save', v); Object.assign(s, v); if (!quiet) toast('Shoot saved'); };
+  el.addEventListener('change', e => { if (e.target.matches('input:not([type=file]),select,textarea')) save(true).catch(() => {}); });
+  el.onclick = async e => {
+    const t = e.target;
+    if (t.matches('[data-save]')) save();
+    else if (t.matches('[data-addcr]')) { const r = document.createElement('div'); r.className = 'cr'; r.innerHTML = `<input data-cl placeholder="Role"><input data-cv placeholder="Name / detail"><button class="btn ghost" data-rmcr type="button">✕</button>`; $('.credits', el).appendChild(r); }
+    else if (t.matches('[data-rmcr]')) { t.closest('.cr').remove(); save(true); }
+    else if (t.matches('[data-delshoot]')) { if (!confirmInline(t, 'Delete this shoot and its photos?')) return; await api('shoot-delete', { id: s.id }); D.shoots = D.shoots.filter(x => x.id !== s.id); D.photos = D.photos.filter(p => p.shoot_id !== s.id); render(); }
+    else if (t.dataset.del) { await api('photo-delete', { id: +t.dataset.del }); D.photos = D.photos.filter(p => p.id !== +t.dataset.del); render(); }
+    else if (t.dataset.cover) { await api('photo-cover', { id: +t.dataset.cover }); D.photos.forEach(p => p.role = p.id === +t.dataset.cover ? 'cover' : null); toast('Cover photo chosen'); render(); }
+  };
+  const drop = $('.drop', el);
+  if (drop) {
+    const input = $('input[type=file]', drop);
+    input.onchange = () => uploadFiles(s, [...input.files], el);
+    drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+    drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); uploadFiles(s, [...e.dataTransfer.files].filter(f => /image\/(jpeg|png)/.test(f.type)), el); });
+  }
+  return el;
+}
+function confirmInline(btn, q) { if (btn.dataset.armed) return true; btn.dataset.armed = 1; const old = btn.textContent; btn.textContent = 'Tap again to confirm'; setTimeout(() => { delete btn.dataset.armed; btn.textContent = old; }, 3000); return false; }
+async function imageSize(file) {
+  try { const b = await createImageBitmap(file); const r = { w: b.width, h: b.height }; b.close && b.close(); return r; }
+  catch { return new Promise(res => { const i = new Image(); i.onload = () => { res({ w: i.naturalWidth, h: i.naturalHeight }); URL.revokeObjectURL(i.src); }; i.onerror = () => res({ w: 0, h: 0 }); i.src = URL.createObjectURL(file); }); }
+}
+let blobClient = null;
+async function uploadFiles(shoot, files, el) {
+  if (!files.length) return;
+  const slot = $('.up-slot', el);
+  for (const f of files) {
+    const tile = document.createElement('div'); tile.className = 'th up'; tile.textContent = 'Uploading… ' + f.name; slot.before(tile);
+    try {
+      const { w, h } = await imageSize(f);
+      let photo;
+      let viaBlob = null;
+      if (D.uploadMode === 'blob') {
+        try {
+          blobClient = blobClient || await import('https://esm.sh/@vercel/blob@2.8.2/client');
+          viaBlob = await blobClient.upload(`orders/${D.order.ref}/s${shoot.id}-${f.name}`, f, { access: 'public', handleUploadUrl: `/api/portal/blob-token?t=${encodeURIComponent(T)}` });
+        } catch (err) { console.warn('Blob upload failed, trying direct upload', err); if (f.size > 4.3 * 1024 * 1024) throw new Error('Upload failed for ' + f.name + '. Please try again.'); }
+      }
+      if (viaBlob) {
+        photo = (await api('photo-register', { shootId: shoot.id, url: viaBlob.url, filename: f.name, width: w, height: h, bytes: f.size })).photo;
+      } else {
+        if (f.size > 4.3 * 1024 * 1024) throw new Error(f.name + ' is larger than 4 MB');
+        photo = (await api('upload', null, { query: `&shoot=${shoot.id}`, raw: f, headers: { 'Content-Type': f.type, 'X-Width': String(w), 'X-Height': String(h), 'X-Filename': encodeURIComponent(f.name) } })).photo;
+      }
+      D.photos.push(photo);
+      tile.innerHTML = `<img src="${esc(photo.url)}" alt="">${photo.low_res ? '<span class="tag">LOW RES</span>' : ''}`; tile.className = 'th';
+    } catch (e) { tile.textContent = '⚠ ' + e.message; }
+  }
+  setTimeout(render, 400);
+}
+
+/* 04 proof */
+function pageHtml(p, idx) {
+  const n = idx + 1, side = n % 2 ? 'r' : 'l', fol = p.type === 'blank' ? '' : `<span class="fol ${side}">${String(n).padStart(2, '0')}</span>`;
+  const cnt = D.comments.filter(c => c.page === n).length; const badge = cnt ? `<span class="cnt">${cnt} comment${cnt > 1 ? 's' : ''}</span>` : '';
+  const sel = selPage === n ? ' sel' : '';
+  if (p.type === 'photo') return `<div class="pg${sel}" data-page="${n}"><img class="${p.mode}" src="${esc(p.url)}" alt="">${p.lowRes ? '<span class="lr">LOW RES</span>' : ''}${badge}${fol}</div>`;
+  if (p.type === 'credit') return `<div class="pg${sel}" data-page="${n}"><div class="in"><div class="num">${String(p.num).padStart(2, '0')}</div><div class="kind">${esc(p.kind)}</div><div class="ttl">${esc(p.title)}</div><dl>${p.credits.map(c => `<dt>${esc(c.label)}</dt><dd>${esc(c.value)}</dd>`).join('')}</dl>${p.story ? `<div class="story">${esc(p.story)}</div>` : ''}</div>${badge}${fol}</div>`;
+  if (p.type === 'bio') return `<div class="pg${sel}" data-page="${n}"><div class="in"><div class="ttl" style="font-size:8cqw">${esc(p.name)}</div><div class="kind">${esc(p.role)}</div><div class="bio">${esc(p.bio)}</div><dl style="margin-top:auto">${p.facts.map(f => `<dt>${esc(f[0])}</dt><dd>${esc(f[1])}</dd>`).join('')}</dl></div>${badge}${fol}</div>`;
+  if (p.type === 'closing') return `<div class="pg closing${sel}" data-page="${n}"><div class="in"><div class="ttl">${esc(p.name)}</div><div class="kind">${esc(p.contact)}</div><div class="kind">${esc(p.website)}</div></div>${badge}</div>`;
+  return `<div class="pg blank" data-page="${n}"></div>`;
+}
+function paneProof() {
+  const P = D.proof;
+  if (!P) { $('#pane').innerHTML = `<div class="card"><h2>Your proof</h2><p class="muted">Your proof isn’t ready yet. Once you’ve sent your photos, we lay out your book and email you when it’s ready to review here.</p></div>`; return; }
+  const L = P.layout, pages = L.pages, open = P.status === 'sent';
+  const flagged = pages.filter(p => p.lowRes).length;
+  const spreads = []; spreads.push([null, pages[0]]); for (let i = 1; i < pages.length; i += 2) spreads.push([pages[i], pages[i + 1]]);
+  $('#pane').innerHTML = `<div class="card">
+    <div class="row" style="justify-content:space-between"><h2>Your proof — version ${P.version}</h2><a class="btn ghost" href="${esc(P.interior_url)}" target="_blank" rel="noopener">Download PDF ↗</a></div>
+    ${P.status === 'approved' ? `<div class="ok">You approved this proof. We’re sending it to print.</div>` : P.status === 'changes' ? `<div class="warn">You asked for changes. We’ll send you a new version soon.</div>` : `<p class="muted">Flip through your book below. Tap a page to comment on it. When you’re happy, approve it at the bottom. Nothing is printed before you approve.</p>`}
+    ${L.cover ? `<div><div class="eyebrow" style="margin-bottom:6px">Cover</div><div class="pg cover-prev" style="cursor:default"><img class="full" src="${esc(L.cover.url)}" alt=""><div class="in" style="justify-content:flex-end;color:#fff"><div class="ttl" style="font-size:10cqw">${esc(L.cover.name)}</div><div class="kind" style="color:#fff">${esc(L.cover.role)}</div></div></div></div>` : ''}
+    <div id="spreads">${spreads.map(([a, b], i) => `<div class="spread">${a ? pageHtml(a, pages.indexOf(a)) : '<div></div>'}${b ? pageHtml(b, pages.indexOf(b)) : '<div></div>'}</div>`).join('')}</div>
+    ${open ? `<div class="card" style="background:var(--bg)" id="cbox"><h3>${selPage ? 'Comment on page ' + selPage : 'General comment'}</h3><textarea id="ctext" placeholder="What should we change?"></textarea><div class="row"><button class="btn" id="csend">Add comment</button>${selPage ? '<button class="btn ghost" id="cgen">Make it a general comment</button>' : ''}</div></div>` : ''}
+    ${D.comments.length ? `<div class="comments"><h3>Comments</h3>${D.comments.map(c => `<div class="cm">${c.page ? `<b>Page ${c.page}:</b> ` : ''}${esc(c.body)}</div>`).join('')}</div>` : ''}
+    ${open ? `<div class="card" style="background:var(--bg)"><h3>Your decision</h3>
+      ${flagged ? `<label class="chk"><input type="checkbox" id="acc"> I’ve seen the ${flagged} photo${flagged > 1 ? 's' : ''} marked LOW RES and I accept ${flagged > 1 ? 'them' : 'it'} as is.</label>` : ''}
+      <label>Note (optional)<textarea id="dnote" style="min-height:60px"></textarea></label>
+      <div class="row"><button class="btn primary" id="approve">Approve for print</button><button class="btn" id="changes">Ask for changes</button></div></div>` : ''}
+  </div>`;
+  $('#spreads').onclick = e => { const pg = e.target.closest('[data-page]'); if (!pg || !open) return; selPage = +pg.dataset.page === selPage ? null : +pg.dataset.page; paneProof(); $('#cbox')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); };
+  if (!open) return;
+  $('#csend').onclick = async () => { const b = $('#ctext').value.trim(); if (!b) return; await api('proof-comment', { proofId: P.id, page: selPage, body: b }); D.comments.push({ page: selPage, body: b }); toast('Comment added'); selPage = null; paneProof(); };
+  $('#cgen') && ($('#cgen').onclick = () => { selPage = null; paneProof(); });
+  const decide = async (decision) => {
+    try { await api('proof-decide', { proofId: P.id, decision, note: $('#dnote').value, acceptFlagged: decision !== 'approve' || !flagged || $('#acc').checked });
+      toast(decision === 'approve' ? 'Approved — thank you!' : 'Request sent'); await load(); step = 'proof'; render(); }
+    catch (e) { toast(e.message); }
+  };
+  $('#approve').onclick = () => { if (flagged && !$('#acc').checked) { toast('Please tick the box about the low-res photos first'); return; } decide('approve'); };
+  $('#changes').onclick = () => decide('changes');
+}
+window.addEventListener('hashchange', () => { if (location.hash === '#proof') load(); });
+load();
+</script>
+</body>
+</html>

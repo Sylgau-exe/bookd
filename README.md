@@ -1,24 +1,37 @@
-# BOOKD website — v1.0
+# BOOKD — v1.2
 
-Static one-page site (5 languages) + one serverless function for the contact form.
+Public site (5 languages) + performer portal + admin back office (English).
 
-## Files
-- `index.html` — the whole site
-- `images/` — sample book images (AI-generated, fictional performers)
-- `api/contact.js` — sends contact/reservation messages by email through Resend
+| Part | URL | Who |
+|---|---|---|
+| Public site | `/` | everyone |
+| Admin back office | `/admin` | Leila and you (login) |
+| Performer portal | `/my/?t=…` (private link per order) | the performer |
 
-## Put it online (GitHub web + Vercel, no command line)
-1. GitHub → New repository → name it `bookd` (private) → create.
-2. "uploading an existing file" → drag the **contents** of this folder (index.html, images, api, README.md) → Commit.
-3. Vercel → Add New → Project → import `bookd` → Framework preset: **Other** → Deploy.
-4. Vercel → Project → Settings → Environment Variables:
-   - `RESEND_API_KEY` = your Resend key
-   - `CONTACT_TO` = where messages should arrive (default sgauthier@executiveproducer.ca)
-   - `RESEND_FROM` = a sender on a domain verified in Resend, e.g. `BOOKD <hello@bookd.example>`
-   Then Deployments → Redeploy.
-5. Test the form. Without the Resend key the site still works: the form shows the message for the visitor to copy and email.
+## What's new in v1.1
+- **Admin** (`/admin`): orders pipeline, order sheet (customer, package, copies, price, payments, shipping, printer & tracking, notes, timeline), website messages (convert to order), team accounts.
+- **Performer portal**: profile, shipping address, shoots with credits + story, photo uploads (low-res flagged, not blocked), cover choice, "Send for layout".
+- **Proofs**: one click builds the layout + print PDFs (interior 8.125 x 10.25 in with bleed, and front cover). The performer flips the proof online, comments per page, then approves (accepting flagged photos) or asks for changes. Nothing prints before approval.
+- **Emails** (Resend): portal link, proof ready, shipped (to the performer); photos submitted, proof approved / changes (to you).
+- Contact-form messages are now also saved in the admin "Messages".
 
-## Later
-- Stripe deposit: set `STRIPE_DEPOSIT_URL` near the top of the script in index.html to your Stripe Payment Link.
-- Custom domain: Vercel → Settings → Domains.
-- Database (Neon) only when the production tool (uploads, proofs, orders) is built.
+## One-time setup in Vercel (project `bookd`)
+1. **Database** — Vercel → bookd → **Storage → Create / Connect → Neon (Postgres)** → connect to the project. This adds `DATABASE_URL` automatically. Tables are created automatically on first use.
+2. **File storage** — Vercel → bookd → **Storage → Create → Blob** → choose **Public** access (it cannot be changed later) and the region closest to your customers → connect it to the `bookd` project.
+3. **Environment variables** (Settings → Environment Variables), in addition to the Resend ones you already have:
+   - `JWT_SECRET` = any long random text (40+ characters) — signs admin logins
+   - `ADMIN_SETUP_KEY` = a one-time password of your choice, used only to create the first admin
+   - `SITE_URL` = `https://bookd-nine.vercel.app` (or your future domain) — used in email links
+4. **Upload these files to GitHub** (replace everything in the repo) → Vercel redeploys automatically. If it doesn't, Deployments → Redeploy.
+5. Open `/admin` → "Create the first admin" → enter the setup key, your name, email, password.
+6. In **Team**, add Leila with a temporary password.
+
+## Daily flow
+Message or new order → **Email link to customer** → performer fills the portal and presses **Send for layout** → you get an email → **Build new proof** → check the PDFs → **Send to customer** → performer approves → set status **Printing**, upload the PDFs to the printer, note the printer order # → set **Shipped** with the tracking # (the performer gets an email).
+
+## Notes
+- Print PDFs follow the Blurb 8x10 Standard Portrait interior size. The full wrap-around cover (front + spine + back) depends on the printer and page count; use the front-cover PDF with the printer's cover template for now.
+- Prices come from the cost model v6 (`lib/pricing.js`).
+
+## v1.2
+- Works with Blob stores connected through OIDC (no read-write token): uploads then go through the site (max ~4 MB per photo). With `BLOB_READ_WRITE_TOKEN` present, large originals upload straight to Blob.

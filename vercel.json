@@ -1,0 +1,10 @@
+{
+  "cleanUrls": true,
+  "functions": {
+    "api/admin/[action].js": { "maxDuration": 60 }
+  },
+  "headers": [
+    { "source": "/admin/(.*)", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
+    { "source": "/my/(.*)", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] }
+  ]
+}
