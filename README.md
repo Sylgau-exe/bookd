@@ -1,4 +1,4 @@
-# BOOKD — v1.2
+# BOOKD — v1.3
 
 Public site (5 languages) + performer portal + admin back office (English).
 
@@ -20,10 +20,10 @@ Public site (5 languages) + performer portal + admin back office (English).
 2. **File storage** — Vercel → bookd → **Storage → Create → Blob** → choose **Public** access (it cannot be changed later) and the region closest to your customers → connect it to the `bookd` project.
 3. **Environment variables** (Settings → Environment Variables), in addition to the Resend ones you already have:
    - `JWT_SECRET` = any long random text (40+ characters) — signs admin logins
-   - `ADMIN_SETUP_KEY` = a one-time password of your choice, used only to create the first admin
+   - `ADMIN_SETUP_KEY` = the password for your first sign-in
    - `SITE_URL` = `https://bookd-nine.vercel.app` (or your future domain) — used in email links
 4. **Upload these files to GitHub** (replace everything in the repo) → Vercel redeploys automatically. If it doesn't, Deployments → Redeploy.
-5. Open `/admin` → "Create the first admin" → enter the setup key, your name, email, password.
+5. Open `/admin` and sign in with **your email + the ADMIN_SETUP_KEY value as password**. That first sign-in creates your admin account (change the password later under Team).
 6. In **Team**, add Leila with a temporary password.
 
 ## Daily flow
@@ -35,3 +35,6 @@ Message or new order → **Email link to customer** → performer fills the port
 
 ## v1.2
 - Works with Blob stores connected through OIDC (no read-write token): uploads then go through the site (max ~4 MB per photo). With `BLOB_READ_WRITE_TOKEN` present, large originals upload straight to Blob.
+
+## v1.3
+- Simpler admin access: one Sign in screen (email + password). The very first sign-in uses ADMIN_SETUP_KEY as the password and creates your account. Extra spaces are ignored.

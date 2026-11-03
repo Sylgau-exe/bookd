@@ -46,18 +46,23 @@ export default async function handler(req, res) {
     const body = req.method === 'POST' ? await readJson(req) : {};
 
     // ---------- setup & login ----------
-    if (action === 'setup') {
+    if (action === 'setup') { // status only (used for diagnostics)
       const n = (await one('SELECT count(*)::int AS n FROM admins')).n;
-      if (req.method === 'GET') return res.json({ ok: true, needsSetup: n === 0, blob: hasBlob() });
-      if (n > 0) return fail(res, 403, 'Setup already done');
-      if (!process.env.ADMIN_SETUP_KEY || body.key !== process.env.ADMIN_SETUP_KEY) return fail(res, 403, 'Wrong setup key');
-      if (!isEmail(body.email) || (body.password || '').length < 8) return fail(res, 400, 'Email and a password of 8+ characters are required');
-      const a = await one('INSERT INTO admins (email, name, password_hash) VALUES ($1,$2,$3) RETURNING id, email, name', [body.email.toLowerCase(), clip(body.name, 80), await bcrypt.hash(body.password, 10)]);
-      return res.json({ ok: true, token: sign(a), admin: a });
+      return res.json({ ok: true, needsSetup: n === 0, blob: hasBlob() });
     }
     if (action === 'login') {
-      const a = await one('SELECT * FROM admins WHERE email=$1', [String(body.email || '').toLowerCase()]);
-      if (!a || !(await bcrypt.compare(body.password || '', a.password_hash))) return fail(res, 401, 'Wrong email or password');
+      const email = String(body.email || '').trim().toLowerCase(), password = String(body.password || '').trim();
+      const count = (await one('SELECT count(*)::int AS n FROM admins')).n;
+      if (count === 0) {
+        // very first sign-in: the password is the ADMIN_SETUP_KEY set in Vercel; this creates the first admin account
+        const key = String(process.env.ADMIN_SETUP_KEY || '').trim();
+        if (!key) return fail(res, 403, 'Set ADMIN_SETUP_KEY in Vercel, redeploy, then sign in with it as your password.');
+        if (!isEmail(email) || password !== key) return fail(res, 401, 'First sign-in: use your email and the ADMIN_SETUP_KEY password from Vercel.');
+        const a = await one('INSERT INTO admins (email, name, password_hash) VALUES ($1,$2,$3) RETURNING id, email, name', [email, email.split('@')[0], await bcrypt.hash(password, 10)]);
+        return res.json({ ok: true, token: sign(a), admin: a, created: true });
+      }
+      const a = await one('SELECT * FROM admins WHERE email=$1', [email]);
+      if (!a || !(await bcrypt.compare(password, a.password_hash))) return fail(res, 401, 'Wrong email or password');
       return res.json({ ok: true, token: sign(a), admin: { id: a.id, email: a.email, name: a.name } });
     }
 

@@ -114,12 +114,10 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 <section class="auth" id="auth" hidden>
   <form class="card" id="auth-form">
     <div><span class="mark">BOOK<i>D</i></span> <span class="eyebrow">Admin</span></div>
-    <h2 id="auth-title">Sign in</h2>
-    <p class="muted small" id="auth-hint" hidden>First-time setup: create the first admin account. You need the ADMIN_SETUP_KEY set in Vercel.</p>
-    <label id="f-key-w" hidden>Setup key<input id="f-key" type="password" autocomplete="off"></label>
-    <label id="f-name-w" hidden>Your name<input id="f-name" autocomplete="name"></label>
+    <h2>Sign in</h2>
     <label>Email<input id="f-email" type="email" autocomplete="username" required></label>
-    <label>Password<input id="f-pass" type="password" autocomplete="current-password" required minlength="8"></label>
+    <label>Password<input id="f-pass" type="password" autocomplete="current-password" required></label>
+    <p class="muted small" id="auth-hint" hidden>First time? Use your email and the password you set as ADMIN_SETUP_KEY in Vercel.</p>
     <div class="warnbox" id="auth-err" hidden></div>
     <button class="btn primary" type="submit" id="auth-btn">Sign in</button>
   </form>
@@ -161,22 +159,14 @@ const post = (a, body) => api(a, { method: 'POST', body });
 async function copyText(t) { try { await navigator.clipboard.writeText(t); toast('Copied'); } catch { prompt('Copy this:', t); } }
 
 /* ---------- auth ---------- */
-let setupMode = false;
 async function showAuth() {
   $('#app').hidden = true; $('#auth').hidden = false;
-  try {
-    const s = await api('setup');
-    setupMode = s.needsSetup;
-  } catch (e) { $('#auth-err').textContent = e.message; $('#auth-err').hidden = false; }
-  $('#auth-title').textContent = setupMode ? 'Create the first admin' : 'Sign in';
-  $('#auth-btn').textContent = setupMode ? 'Create account' : 'Sign in';
-  ['#auth-hint', '#f-key-w', '#f-name-w'].forEach(s => $(s).hidden = !setupMode);
+  try { const s = await api('setup'); $('#auth-hint').hidden = !s.needsSetup; } catch (e) { $('#auth-err').textContent = e.message; $('#auth-err').hidden = false; }
 }
 $('#auth-form').addEventListener('submit', async e => {
   e.preventDefault(); $('#auth-err').hidden = true;
   try {
-    const body = { email: $('#f-email').value.trim(), password: $('#f-pass').value };
-    const r = setupMode ? await post('setup', { ...body, key: $('#f-key').value, name: $('#f-name').value }) : await post('login', body);
+    const r = await post('login', { email: $('#f-email').value.trim(), password: $('#f-pass').value });
     TOKEN = r.token; try { localStorage.setItem('bookd_admin', TOKEN); } catch {}
     start();
   } catch (err) { $('#auth-err').textContent = err.message; $('#auth-err').hidden = false; }
