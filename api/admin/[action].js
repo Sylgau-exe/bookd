@@ -10,6 +10,8 @@ import { buildLayout } from '../../lib/layout.js';
 import { buildPdfs } from '../../lib/pdf.js';
 import { savePublic, removePublic, hasBlob } from '../../lib/storage.js';
 import * as lulu from '../../lib/lulu.js';
+import { createOrder, balanceDue } from '../../lib/orders.js';
+import { hasStripe, stripeMode } from '../../lib/stripe.js';
 
 const token = () => crypto.randomBytes(24).toString('hex');
 const STATUS_KEYS = STATUSES.map(s => s[0]);
@@ -26,19 +28,6 @@ async function loadOrder(id) {
   const events = await q('SELECT * FROM events WHERE order_id=$1 ORDER BY created_at DESC LIMIT 100', [id]);
   return { order, shoots, photos, proofs, comments, events };
 }
-async function createOrder(fields, actor) {
-  await ensureSchema();
-  const pkg = PACKAGES[fields.package] ? fields.package : 'signature';
-  const copies = Math.max(1, Math.min(50, parseInt(fields.copies, 10) || 1));
-  const row = await one(`INSERT INTO orders (token, status, customer_name, customer_email, phone, lang, package, copies, price_usd, notes)
-    VALUES ($1,'new',$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-    [token(), clip(fields.customer_name, 120), clip(fields.customer_email, 200), clip(fields.phone, 60), clip(fields.lang || 'en', 5), pkg, copies, priceFor(pkg, copies), clip(fields.notes, 4000)]);
-  const ref = 'BK-' + String(1000 + row.id);
-  await q('UPDATE orders SET ref=$1 WHERE id=$2', [ref, row.id]);
-  await logEvent(row.id, actor, 'Order created');
-  return { ...row, ref };
-}
-
 export default async function handler(req, res) {
   const action = req.query.action;
   return handle(req, res, async () => {
@@ -71,7 +60,7 @@ export default async function handler(req, res) {
     const who = admin.name || admin.email;
 
     switch (action) {
-      case 'me': return res.json({ ok: true, admin, statuses: STATUSES, packages: PACKAGES, blob: hasBlob(), lulu: { configured: lulu.hasLulu(), env: lulu.luluEnv(), levels: lulu.SHIPPING_LEVELS } });
+      case 'me': return res.json({ ok: true, admin, statuses: STATUSES, packages: PACKAGES, blob: hasBlob(), lulu: { configured: lulu.hasLulu(), env: lulu.luluEnv(), levels: lulu.SHIPPING_LEVELS }, stripe: { configured: hasStripe(), mode: stripeMode() } });
       case 'dashboard': {
         const counts = await q('SELECT status, count(*)::int AS n FROM orders GROUP BY status');
         const unread = (await one(`SELECT count(*)::int AS n FROM messages WHERE status='new'`)).n;
@@ -88,7 +77,7 @@ export default async function handler(req, res) {
       case 'order': {
         const d = await loadOrder(parseInt(req.query.id || body.id, 10));
         if (!d) return fail(res, 404, 'Order not found');
-        return res.json({ ok: true, ...d, portalUrl: `${siteUrl(req)}/my/?t=${d.order.token}` });
+        return res.json({ ok: true, ...d, balanceDue: balanceDue(d.order), portalUrl: `${siteUrl(req)}/my/?t=${d.order.token}` });
       }
       case 'order-create': {
         if (!body.customer_name || !isEmail(body.customer_email)) return fail(res, 400, 'Customer name and a valid email are required');

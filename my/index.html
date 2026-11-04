@@ -106,6 +106,8 @@ textarea{min-height:90px;resize:vertical}
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const T = new URLSearchParams(location.search).get('t') || '';
+const PAID = new URLSearchParams(location.search).get('paid') || '';
+const usd = v => '$' + Number(v || 0).toFixed(2) + ' USD';
 let D = null, step = 'about', selPage = null;
 function toast(t) { const el = $('#toast'); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => el.hidden = true, 2600); }
 async function api(action, body, opts = {}) {
@@ -117,7 +119,7 @@ async function api(action, body, opts = {}) {
 async function load() {
   try { D = await api('get'); } catch (e) { $('#root').innerHTML = `<div class="center"><div><h2>We can’t open this book</h2><p class="muted">${esc(e.message)}</p></div></div>`; return; }
   $('#ref').textContent = `${D.order.ref} · ${D.order.packageLabel} · up to ${D.order.maxPhotos} photos`;
-  if (location.hash === '#proof' && D.proof) step = 'proof';
+  if ((location.hash === '#proof' || PAID === 'balance') && D.proof) step = 'proof';
   render();
 }
 function stepsDone() {
@@ -130,7 +132,9 @@ function render() {
   $('#root').innerHTML = `
     <h1>${esc(D.order.profile.name || D.order.customer_name || 'Your book')}</h1>
     <p class="muted">Your BOOKD in four steps. Everything saves as you go, so you can come back to this page any time with the same link.</p>
-    ${D.order.locked ? `<div class="ok">Your book is approved and in production. Thank you!</div>` : ''}
+    ${PAID === 'deposit' ? `<div class="ok">Payment received — your book is reserved. We also emailed you this private link so you can come back any time.</div>` : ''}
+    ${PAID === 'balance' ? `<div class="ok">Balance received — thank you! Your book goes to print now.</div>` : ''}
+    ${D.order.locked && PAID !== 'balance' ? `<div class="ok">Your book is approved and in production. Thank you!</div>` : ''}
     <nav class="steps">${names.map(([k, l], i) => `<a href="#${k}" data-step="${k}" class="${step === k ? 'on' : ''} ${done[k] ? 'done' : ''}"><b>0${i + 1}</b>${l}</a>`).join('')}</nav>
     <section id="pane"></section>`;
   $('.steps').onclick = e => { const a = e.target.closest('a[data-step]'); if (!a) return; e.preventDefault(); step = a.dataset.step; render(); };
@@ -268,6 +272,14 @@ function pageHtml(p, idx) {
   if (p.type === 'closing') return `<div class="pg closing${sel}" data-page="${n}"><div class="in"><div class="ttl">${esc(p.name)}</div><div class="kind">${esc(p.contact)}</div><div class="kind">${esc(p.website)}</div></div>${badge}</div>`;
   return `<div class="pg blank" data-page="${n}"></div>`;
 }
+function payBox() {
+  const p = D.order.pay || {};
+  if (!p.online || p.price == null) return '';
+  if (p.balance_paid) return `<div class="ok">Paid in full (${usd(p.paid)}). Thank you!</div>`;
+  if (p.shipping == null) return `<div class="warn">Paid so far: ${usd(p.paid)}. We’re confirming your shipping cost and will email you the final amount.</div>`;
+  return `<div class="card" style="background:var(--bg)"><h3>Balance</h3><p class="muted">Book ${usd(p.price)} + shipping ${usd(p.shipping)} − paid ${usd(p.paid)} = <b>${usd(p.due)}</b></p>
+    <div class="row"><button class="btn primary" id="paybal">Pay the balance</button></div></div>`;
+}
 function paneProof() {
   const P = D.proof;
   if (!P) { $('#pane').innerHTML = `<div class="card"><h2>Your proof</h2><p class="muted">Your proof isn’t ready yet. Once you’ve sent your photos, we lay out your book and email you when it’s ready to review here.</p></div>`; return; }
@@ -276,7 +288,7 @@ function paneProof() {
   const spreads = []; spreads.push([null, pages[0]]); for (let i = 1; i < pages.length; i += 2) spreads.push([pages[i], pages[i + 1]]);
   $('#pane').innerHTML = `<div class="card">
     <div class="row" style="justify-content:space-between"><h2>Your proof — version ${P.version}</h2><a class="btn ghost" href="${esc(P.interior_url)}" target="_blank" rel="noopener">Download PDF ↗</a></div>
-    ${P.status === 'approved' ? `<div class="ok">You approved this proof. We’re sending it to print.</div>` : P.status === 'changes' ? `<div class="warn">You asked for changes. We’ll send you a new version soon.</div>` : `<p class="muted">Flip through your book below. Tap a page to comment on it. When you’re happy, approve it at the bottom. Nothing is printed before you approve.</p>`}
+    ${P.status === 'approved' ? `<div class="ok">You approved this proof. We’re sending it to print.</div>${payBox()}` : P.status === 'changes' ? `<div class="warn">You asked for changes. We’ll send you a new version soon.</div>` : `<p class="muted">Flip through your book below. Tap a page to comment on it. When you’re happy, approve it at the bottom. Nothing is printed before you approve.</p>`}
     ${L.cover ? `<div><div class="eyebrow" style="margin-bottom:6px">Cover</div><div class="pg cover-prev" style="cursor:default"><img class="full" src="${esc(L.cover.url)}" alt=""><div class="in" style="justify-content:flex-end;color:#fff"><div class="ttl" style="font-size:10cqw">${esc(L.cover.name)}</div><div class="kind" style="color:#fff">${esc(L.cover.role)}</div></div></div></div>` : ''}
     <div id="spreads">${spreads.map(([a, b], i) => `<div class="spread">${a ? pageHtml(a, pages.indexOf(a)) : '<div aria-hidden="true"></div>'}${b ? pageHtml(b, pages.indexOf(b)) : '<div aria-hidden="true"></div>'}</div>`).join('')}</div>
     ${open ? `<div class="card" style="background:var(--bg)" id="cbox"><h3>${selPage ? 'Comment on page ' + selPage : 'General comment'}</h3><textarea id="ctext" placeholder="What should we change?"></textarea><div class="row"><button class="btn" id="csend">Add comment</button>${selPage ? '<button class="btn ghost" id="cgen">Make it a general comment</button>' : ''}</div></div>` : ''}
@@ -287,6 +299,8 @@ function paneProof() {
       <div class="row"><button class="btn primary" id="approve">Approve for print</button><button class="btn" id="changes">Ask for changes</button></div></div>` : ''}
   </div>`;
   $('#spreads').onclick = e => { const pg = e.target.closest('[data-page]'); if (!pg || !open) return; selPage = +pg.dataset.page === selPage ? null : +pg.dataset.page; paneProof(); $('#cbox')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); };
+  $('#paybal') && ($('#paybal').onclick = async () => { const b = $('#paybal'); b.disabled = true; b.textContent = 'Opening secure payment…';
+    try { const r = await fetch(`/api/checkout?action=balance&t=${encodeURIComponent(T)}`, { method: 'POST' }); const j = await r.json(); if (!r.ok || !j.url) throw new Error(j.error || 'Payment unavailable'); location.href = j.url; } catch (e) { toast(e.message); b.disabled = false; b.textContent = 'Pay the balance'; } });
   if (!open) return;
   $('#csend').onclick = async () => { const b = $('#ctext').value.trim(); if (!b) return; await api('proof-comment', { proofId: P.id, page: selPage, body: b }); D.comments.push({ page: selPage, body: b }); toast('Comment added'); selPage = null; paneProof(); };
   $('#cgen') && ($('#cgen').onclick = () => { selPage = null; paneProof(); });

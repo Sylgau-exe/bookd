@@ -1,4 +1,4 @@
-# BOOKD — v1.8
+# BOOKD — v1.9
 
 Public site (5 languages) + performer portal + admin back office (English).
 
@@ -72,3 +72,21 @@ Message or new order → **Email link to customer** → performer fills the port
 | `LULU_CONTACT_EMAIL` | Email Lulu contacts about print jobs (optional, default CONTACT_TO) |
 
 Sandbox jobs are never printed and are paid with a test card in the sandbox Print Jobs page. Switch to live = change the three LULU_ values to the production keys + `production`, then redeploy.
+
+## v1.9 — Online payment (Stripe)
+- **Reserve = pay the deposit.** On the public site, "Reserve my spot" opens Stripe Checkout for the deposit (DEPOSIT_PERCENT of the package price, default 50%; copies from the estimator). When it's paid, the order is **created automatically**, marked "deposit paid", the performer lands straight on their private portal and receives the link by email; you get a "New order" email.
+- **Balance.** After the performer approves the proof, set **Shipping (USD)** on the order (use the Lulu price). The portal then shows "Pay the balance" (book + shipping − paid). When paid, the order shows "balance paid" and you get an email. "Send to Lulu" warns if the balance isn't paid.
+- Without Stripe keys, the site falls back to the reservation form as before.
+
+### Stripe setup (test mode first)
+1. Stripe dashboard → switch on **Test mode** → Developers → **API keys** → copy the **Secret key** (`sk_test_…`).
+2. Developers → **Webhooks** → Add endpoint `https://bookd-nine.vercel.app/api/stripe-webhook`, event **checkout.session.completed** → copy the **Signing secret** (`whsec_…`).
+3. Vercel environment variables:
+
+| Name | Value |
+|---|---|
+| `STRIPE_SECRET_KEY` | `sk_test_…` (later `sk_live_…`) |
+| `STRIPE_WEBHOOK_SECRET` | `whsec_…` from step 2 |
+| `DEPOSIT_PERCENT` | optional, default `50` |
+
+Test card: **4242 4242 4242 4242**, any future date, any CVC, any postal code. Payments show as TEST in the order timeline.

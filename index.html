@@ -559,7 +559,6 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 
 <script>
 // Set this to the Stripe Payment Link for the deposit when it exists. While empty, "Reserve" opens the reservation form.
-const STRIPE_DEPOSIT_URL = "";
 const CONTACT_EMAIL = "sgauthier@executiveproducer.ca";
 
 const T = {
@@ -1041,14 +1040,29 @@ document.getElementById("lang-select").addEventListener("change", e => {
   lang = e.target.value; try { localStorage.setItem("bookd-lang", lang); } catch (err) {} applyLang();
 });
 
-// Reserve buttons: Stripe deposit link when configured, otherwise the reservation form.
+// Reserve buttons: secure Stripe deposit (creates the order and opens the performer portal) when online payment is on,
+// otherwise the reservation form.
 const pkgIndex = {essentiel:"1", signature:"2", prestige:"3"};
-document.querySelectorAll("[data-pkg]").forEach(b => b.addEventListener("click", () => {
-  if (STRIPE_DEPOSIT_URL) { const a = document.createElement("a"); a.href = STRIPE_DEPOSIT_URL; a.target = "_blank"; a.rel = "noopener"; a.click(); return; }
+const PAY_WAIT = {fr:"Redirection vers le paiement sécurisé…", en:"Opening secure payment…", es:"Abriendo el pago seguro…", pt:"Abrindo o pagamento seguro…", it:"Apertura del pagamento sicuro…"};
+let PAY = {enabled:false};
+fetch("/api/checkout?action=config").then(r => r.ok ? r.json() : {}).then(j => { PAY = j || {enabled:false}; }).catch(() => {});
+function reserveByForm(pkg){
   document.getElementById("t-r").checked = true;
-  document.getElementById("f-pkg").value = pkgIndex[b.dataset.pkg];
+  document.getElementById("f-pkg").value = pkgIndex[pkg];
   document.getElementById("contact").scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
   setTimeout(() => document.getElementById("f-name").focus({preventScroll:true}), 400);
+}
+document.querySelectorAll("[data-pkg]").forEach(b => b.addEventListener("click", async () => {
+  const pkg = b.dataset.pkg;
+  if (!PAY.enabled) return reserveByForm(pkg);
+  const label = b.innerHTML; b.disabled = true; b.textContent = PAY_WAIT[lang] || PAY_WAIT.en;
+  try {
+    const copies = estPkg === pkg ? Math.max(1, Math.min(50, estQty || 1)) : 1;
+    const r = await fetch("/api/checkout?action=deposit", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({package: pkg, copies, lang})});
+    const j = await r.json();
+    if (!r.ok || !j.url) throw new Error(j.error || "checkout");
+    location.href = j.url;
+  } catch (err) { b.disabled = false; b.innerHTML = label; reserveByForm(pkg); }
 }));
 
 const form = document.getElementById("inq");

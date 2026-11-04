@@ -5,6 +5,8 @@ import { sendMail, adminInbox } from '../../lib/mail.js';
 import { savePublic, removePublic, canClientUpload } from '../../lib/storage.js';
 import { PACKAGES, isLowRes } from '../../lib/pricing.js';
 import { KIND_LABELS } from '../../lib/layout.js';
+import { balanceDue } from '../../lib/orders.js';
+import { hasStripe } from '../../lib/stripe.js';
 
 const LOCKED = ['approved', 'printing', 'shipped', 'delivered', 'cancelled'];
 const PROFILE_KEYS = ['name', 'role', 'bio', 'height', 'languages', 'agency', 'city', 'contact', 'website'];
@@ -39,7 +41,9 @@ export default async function handler(req, res) {
       const pkg = PACKAGES[order.package] || PACKAGES.signature;
       return res.json({ ok: true, uploadMode: canClientUpload() ? 'blob' : 'direct', kinds: KIND_LABELS,
         order: { ref: order.ref, status: order.status, locked, customer_name: order.customer_name, package: order.package, packageLabel: pkg.label, maxPhotos: pkg.maxPhotos, pages: pkg.pages, copies: order.copies,
-          profile: order.profile || {}, ship: Object.fromEntries(SHIP_KEYS.map(k => [k, order[k] || ''])), submitted_at: order.submitted_at },
+          profile: order.profile || {}, ship: Object.fromEntries(SHIP_KEYS.map(k => [k, order[k] || ''])), submitted_at: order.submitted_at,
+          pay: { online: hasStripe(), price: order.price_usd == null ? null : +order.price_usd, shipping: order.shipping_usd == null ? null : +order.shipping_usd,
+            paid: +(order.paid_usd || order.deposit_usd || 0), deposit_paid: !!order.deposit_paid, balance_paid: !!order.balance_paid, due: balanceDue(order) } },
         shoots, photos, proof, comments });
     }
     const body = req.method === 'POST' && action !== 'upload' ? await readJson(req) : {};
