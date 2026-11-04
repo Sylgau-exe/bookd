@@ -9,11 +9,12 @@ import { PACKAGES, priceFor, STATUSES } from '../../lib/pricing.js';
 import { buildLayout } from '../../lib/layout.js';
 import { buildPdfs } from '../../lib/pdf.js';
 import { savePublic, removePublic, hasBlob } from '../../lib/storage.js';
+import * as lulu from '../../lib/lulu.js';
 
 const token = () => crypto.randomBytes(24).toString('hex');
 const STATUS_KEYS = STATUSES.map(s => s[0]);
 const EDITABLE = ['status', 'customer_name', 'customer_email', 'phone', 'lang', 'package', 'copies', 'price_usd', 'shipping_usd', 'deposit_paid', 'balance_paid',
-  'ship_name', 'ship_address', 'ship_city', 'ship_region', 'ship_postal', 'ship_country', 'printer', 'printer_order_id', 'tracking', 'notes'];
+  'ship_name', 'ship_address', 'ship_city', 'ship_region', 'ship_postal', 'ship_country', 'printer', 'printer_order_id', 'tracking', 'notes', 'ship_level'];
 
 async function loadOrder(id) {
   const order = await one('SELECT * FROM orders WHERE id=$1', [id]);
@@ -70,7 +71,7 @@ export default async function handler(req, res) {
     const who = admin.name || admin.email;
 
     switch (action) {
-      case 'me': return res.json({ ok: true, admin, statuses: STATUSES, packages: PACKAGES, blob: hasBlob() });
+      case 'me': return res.json({ ok: true, admin, statuses: STATUSES, packages: PACKAGES, blob: hasBlob(), lulu: { configured: lulu.hasLulu(), env: lulu.luluEnv(), levels: lulu.SHIPPING_LEVELS } });
       case 'dashboard': {
         const counts = await q('SELECT status, count(*)::int AS n FROM orders GROUP BY status');
         const unread = (await one(`SELECT count(*)::int AS n FROM messages WHERE status='new'`)).n;
@@ -105,6 +106,7 @@ export default async function handler(req, res) {
           if (k === 'copies') v = Math.max(1, Math.min(50, parseInt(v, 10) || 1));
           if (k === 'price_usd' || k === 'shipping_usd') v = v === '' || v == null ? null : Number(v);
           if (k === 'deposit_paid' || k === 'balance_paid') v = !!v;
+          if (k === 'ship_level' && !lulu.SHIPPING_LEVELS.includes(v)) v = 'MAIL';
           if (typeof v === 'string') v = clip(v, 4000);
           vals.push(v); sets.push(`${k}=$${vals.length}`);
         }
@@ -195,6 +197,7 @@ export default async function handler(req, res) {
         const d = await loadOrder(parseInt(body.id, 10)); if (!d) return fail(res, 404, 'Order not found');
         const layout = buildLayout(d.order, d.shoots, d.photos);
         if (!layout.cover) return fail(res, 400, 'Add photos before building a proof');
+        layout.coverDims = await lulu.coverDimensions(layout.binding, layout.pageCount);
         const pdf = await buildPdfs(layout, siteUrl(req));
         const version = (d.proofs[0]?.version || 0) + 1;
         const interior_url = await savePublic(`proofs/${d.order.ref}/v${version}-interior.pdf`, pdf.interior, 'application/pdf');
@@ -202,7 +205,7 @@ export default async function handler(req, res) {
         const p = await one(`INSERT INTO proofs (order_id, version, status, layout, interior_url, cover_url, page_count) VALUES ($1,$2,'draft',$3,$4,$5,$6) RETURNING id`,
           [d.order.id, version, JSON.stringify(layout), interior_url, cover_url, pdf.pageCount]);
         await q(`UPDATE orders SET status = CASE WHEN status IN ('new','collecting','changes') THEN 'layout' ELSE status END, updated_at=now() WHERE id=$1`, [d.order.id]);
-        await logEvent(d.order.id, who, `Proof v${version} built (${pdf.pageCount} pages)`);
+        await logEvent(d.order.id, who, `Proof v${version} built (${pdf.pageCount} pages, cover ${(pdf.coverSize.width / 72).toFixed(3)} x ${(pdf.coverSize.height / 72).toFixed(3)} in${layout.coverDims.source === 'lulu' ? ' from Lulu' : ' estimated'})`);
         return res.json({ ok: true, proofId: p.id, version, warnings: layout.warnings, interior_url, cover_url });
       }
       case 'send-proof': {
@@ -219,6 +222,65 @@ export default async function handler(req, res) {
       }
       case 'comment-resolve': {
         await q('UPDATE proof_comments SET resolved=$1 WHERE id=$2', [!!body.resolved, parseInt(body.id, 10)]); return res.json({ ok: true });
+      }
+      // ---------- Lulu print jobs ----------
+      case 'printer-quote':
+      case 'printer-send': {
+        const o = await one('SELECT * FROM orders WHERE id=$1', [parseInt(body.id, 10)]); if (!o) return fail(res, 404, 'Order not found');
+        if (!lulu.hasLulu()) return fail(res, 400, 'Lulu is not connected yet: add LULU_CLIENT_KEY, LULU_CLIENT_SECRET and LULU_ENV in Vercel, then redeploy.');
+        const p = await one(`SELECT * FROM proofs WHERE order_id=$1 AND status='approved' ORDER BY version DESC LIMIT 1`, [o.id]);
+        if (!p) return fail(res, 400, 'The customer has not approved a proof yet. Only an approved proof can be printed.');
+        const { address, problems } = lulu.addressFor(o);
+        if (problems.length) return fail(res, 400, 'Shipping address incomplete: ' + problems.join(', '));
+        const pkg = PACKAGES[o.package] || PACKAGES.signature, cover = p.layout?.binding || pkg.cover;
+        const level = lulu.SHIPPING_LEVELS.includes(body.level) ? body.level : (o.ship_level || 'MAIL');
+        let qt;
+        try { qt = await lulu.quote({ cover, pages: p.page_count, quantity: o.copies || 1, address, level }); }
+        catch (e) { return fail(res, 400, e.message); }
+        const costTxt = `${qt.total.toFixed(2)} ${qt.currency} incl. tax (books ${qt.books.toFixed(2)} + shipping ${qt.shipping.toFixed(2)} + fee ${qt.fulfillment.toFixed(2)} + tax ${qt.tax.toFixed(2)}, ${level})`;
+        if (action === 'printer-quote') return res.json({ ok: true, quote: qt, level, text: costTxt, env: lulu.luluEnv() });
+        if (o.printer_order_id && /^Lulu/.test(o.printer || '') && !['CANCELED', 'REJECTED', 'ERROR'].includes(o.printer_status) && !body.force)
+          return fail(res, 400, `Already sent to Lulu (print job ${o.printer_order_id}, ${o.printer_status || 'status unknown'}).`);
+        const toAbs = (u) => /^https?:/.test(u) ? u : siteUrl(req) + u;
+        let job;
+        try { job = await lulu.createJob({ ref: o.ref, title: `BOOKD — ${o.profile?.name || o.customer_name || o.ref}`, cover, quantity: o.copies || 1,
+          interiorUrl: toAbs(p.interior_url), coverUrl: toAbs(p.cover_url), address, level }); }
+        catch (e) { await logEvent(o.id, who, 'Lulu refused the print job: ' + e.message); return fail(res, 400, e.message); }
+        const env = lulu.luluEnv();
+        await q(`UPDATE orders SET printer=$1, printer_order_id=$2, printer_status=$3, printer_env=$4, printer_cost=$5, ship_level=$6, printer_sent_at=now(),
+          status = CASE WHEN status IN ('approved','proof_sent','layout','changes') THEN 'printing' ELSE status END, updated_at=now() WHERE id=$7`,
+          [env === 'production' ? 'Lulu' : 'Lulu (sandbox)', String(job.id), job.status?.name || 'CREATED', env, costTxt, level, o.id]);
+        await logEvent(o.id, who, `Sent to Lulu${env === 'production' ? '' : ' SANDBOX (test, not printed)'}: print job ${job.id}, proof v${p.version}, ${o.copies || 1} cop${(o.copies || 1) > 1 ? 'ies' : 'y'}, ${level}. Quote ${costTxt}`);
+        return res.json({ ok: true, jobId: job.id, status: job.status?.name, env, text: costTxt });
+      }
+      case 'printer-refresh': {
+        const o = await one('SELECT * FROM orders WHERE id=$1', [parseInt(body.id, 10)]); if (!o) return fail(res, 404, 'Order not found');
+        if (!o.printer_order_id || !/^Lulu/.test(o.printer || '')) return fail(res, 400, 'No Lulu print job on this order');
+        if ((o.printer_env || 'sandbox') !== lulu.luluEnv()) return fail(res, 400, `This job was created in Lulu ${o.printer_env}; the site is now set to ${lulu.luluEnv()}.`);
+        let job; try { job = await lulu.getJob(o.printer_order_id); } catch (e) { return fail(res, 400, e.message); }
+        const st = job.status?.name || 'UNKNOWN', tr = lulu.trackingOf(job), trackTxt = tr.map(t => [t.carrier, t.id, t.url].filter(Boolean).join(' ')).join(' | ');
+        const sets = ['printer_status=$1'], vals = [st];
+        if (trackTxt) { vals.push(trackTxt); sets.push(`tracking=$${vals.length}`); }
+        vals.push(o.id); await q(`UPDATE orders SET ${sets.join(', ')}, updated_at=now() WHERE id=$${vals.length}`, vals);
+        if (st !== o.printer_status) await logEvent(o.id, 'Lulu', `Print job ${o.printer_order_id}: ${o.printer_status || '—'} → ${st}${job.status?.message ? ' (' + clip(job.status.message, 300) + ')' : ''}`);
+        if (st === 'SHIPPED' && !['shipped', 'delivered'].includes(o.status)) {
+          await q(`UPDATE orders SET status='shipped', updated_at=now() WHERE id=$1`, [o.id]);
+          await logEvent(o.id, 'system', 'Status: printing → shipped (Lulu)');
+          if (isEmail(o.customer_email)) {
+            await sendMail({ to: o.customer_email, subject: `Your BOOKD book is on its way (${o.ref})`,
+              text: `Hello ${o.customer_name || ''},\n\nYour BOOKD book has shipped.${trackTxt ? `\nTracking: ${trackTxt}` : ''}\n\nThank you!\nBOOKD` });
+            await logEvent(o.id, 'system', 'Shipping email sent to customer');
+          }
+        }
+        return res.json({ ok: true, status: st, message: job.status?.message || '', tracking: trackTxt });
+      }
+      case 'printer-cancel': {
+        const o = await one('SELECT * FROM orders WHERE id=$1', [parseInt(body.id, 10)]); if (!o) return fail(res, 404, 'Order not found');
+        if (!o.printer_order_id) return fail(res, 400, 'No Lulu print job on this order');
+        try { await lulu.cancelJob(o.printer_order_id); } catch (e) { return fail(res, 400, 'Lulu can only cancel a job before it is paid. ' + e.message); }
+        await q(`UPDATE orders SET printer_status='CANCELED', status=CASE WHEN status='printing' THEN 'approved' ELSE status END, updated_at=now() WHERE id=$1`, [o.id]);
+        await logEvent(o.id, who, `Lulu print job ${o.printer_order_id} cancelled`);
+        return res.json({ ok: true });
       }
       default: return fail(res, 404, 'Unknown action');
     }

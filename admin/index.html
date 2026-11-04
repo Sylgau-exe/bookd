@@ -277,6 +277,7 @@ async function viewOrder(id) {
             ${cs.map(c => `<div class="comment ${c.resolved ? 'done' : ''}"><span>${c.page ? `<b>Page ${c.page}:</b> ` : ''}${esc(c.body)} <span class="muted small">— ${esc(c.author)}, ${when(c.created_at)}</span></span><button class="btn ghost small" data-res="${c.id}" data-v="${c.resolved ? 0 : 1}">${c.resolved ? 'Reopen' : 'Done'}</button></div>`).join('')}</div>`;
         }).join('') : '<div class="small muted">No proof yet. When the photos are in, press “Build new proof”: the layout and print PDFs are made automatically.</div>'}
       </section>
+      ${luluCard(d)}
     </div>
     <div class="stack">
       <form class="card stack" id="details">
@@ -310,6 +311,7 @@ async function viewOrder(id) {
     </div>
   </div>`;
   const reload = () => viewOrder(id);
+  bindLulu(id, reload);
   $('#st').onchange = async e => {
     const s = e.target.value;
     if (s === 'shipped' && !confirmTracking(o)) { e.target.value = o.status; return; }
@@ -338,6 +340,38 @@ async function viewOrder(id) {
     else if (t.dataset.send) { t.disabled = true; try { await post('send-proof', { proofId: +t.dataset.send }); toast('Proof sent to customer'); reload(); } catch (err) { toast(err.message); t.disabled = false; } }
     else if (t.dataset.res) { await post('comment-resolve', { id: +t.dataset.res, resolved: t.dataset.v === '1' }); reload(); }
   };
+}
+function luluCard(d) {
+  const o = d.order, L = META.lulu || {}, approved = d.proofs.find(p => p.status === 'approved');
+  const live = L.env === 'production', job = o.printer_order_id && /^Lulu/.test(o.printer || '');
+  const lvl = o.ship_level || 'MAIL';
+  return `<section class="card stack" id="lulu">
+    <div class="row" style="justify-content:space-between"><h2>Print with Lulu</h2>${L.configured ? `<span class="pill ${live ? 's-approved' : 's-proof_sent'}">${live ? 'LIVE — real printing' : 'SANDBOX — test, nothing printed'}</span>` : '<span class="pill">not connected</span>'}</div>
+    ${!L.configured ? '<div class="small muted">Add <b>LULU_CLIENT_KEY</b>, <b>LULU_CLIENT_SECRET</b> and <b>LULU_ENV</b> (sandbox or production) in Vercel → Settings → Environment Variables, then redeploy.</div>' : `
+    <div class="small muted">${approved ? `Prints the <b>approved proof v${approved.version}</b> (${approved.page_count} pages, ${esc(approved.layout?.binding === 'hard' ? 'hardcover' : 'softcover')}) · ${o.copies} cop${o.copies > 1 ? 'ies' : 'y'} · ships to ${esc([o.ship_city, o.ship_country].filter(Boolean).join(', ') || 'no address yet')}` : 'Waiting for the customer to approve a proof.'}</div>
+    <div class="row"><label style="min-width:220px">Shipping<select id="lulu-level">${(L.levels || ['MAIL']).map(l => `<option ${l === lvl ? 'selected' : ''} value="${l}">${l.replace('_', ' ').toLowerCase()}</option>`).join('')}</select></label></div>
+    <div class="row"><button class="btn" type="button" id="lulu-quote" ${approved ? '' : 'disabled'}>Get Lulu price</button>
+      <button class="btn primary" type="button" id="lulu-send" ${approved && (!job || ['CANCELED', 'REJECTED', 'ERROR'].includes(o.printer_status)) ? '' : 'disabled'}>Send to Lulu</button>
+      ${job ? `<button class="btn" type="button" id="lulu-refresh">Refresh status</button>${['CREATED', 'UNPAID'].includes(o.printer_status) ? '<button class="btn ghost" type="button" id="lulu-cancel">Cancel job</button>' : ''}` : ''}</div>`}
+    ${job ? `<dl class="kv"><dt>Print job</dt><dd>${esc(o.printer_order_id)} <span class="muted small">(${esc(o.printer_env || '')})</span></dd><dt>Lulu status</dt><dd><b>${esc(o.printer_status || '—')}</b></dd>
+      <dt>Lulu cost</dt><dd>${esc(o.printer_cost || '—')}</dd><dt>Tracking</dt><dd>${esc(o.tracking || '—')}</dd></dl>
+      ${o.printer_status === 'UNPAID' ? `<div class="warnbox">Lulu is waiting for payment. Open <a href="https://developers${o.printer_env === 'production' ? '' : '.sandbox'}.lulu.com/print-jobs" target="_blank" rel="noopener">Lulu → Print Jobs</a> and pay job ${esc(o.printer_order_id)}${o.printer_env === 'production' ? '' : ' with a test card'}.</div>` : ''}` : ''}
+    <div id="lulu-out"></div>
+  </section>`;
+}
+function bindLulu(id, reload) {
+  const out = (h) => { const el = $('#lulu-out'); if (el) el.innerHTML = h; };
+  const lvl = () => $('#lulu-level')?.value || 'MAIL';
+  const go = async (btn, action, extra, ok) => { const b = $(btn); if (!b) return; b.onclick = async () => {
+    b.disabled = true; out('<div class="small muted">Talking to Lulu…</div>');
+    try { const r = await post(action, { id, level: lvl(), ...(extra ? extra() : {}) }); ok(r); } catch (e) { out(`<div class="warnbox">${esc(e.message)}</div>`); b.disabled = false; } }; };
+  go('#lulu-quote', 'printer-quote', null, r => { out(`<div class="small"><b>Lulu price (${esc(r.env)}):</b> ${esc(r.text)}</div>`); $('#lulu-quote').disabled = false; });
+  const sendBtn = $('#lulu-send');
+  if (sendBtn) sendBtn.onclick = () => openDialog(`<h2>Send to Lulu?</h2><p>${META.lulu?.env === 'production' ? '<b>This is the LIVE account: the book will be printed and shipped, and Lulu will charge your card.</b>' : 'Sandbox: a test print job is created. Nothing is printed or charged.'}</p><p>Shipping: <b>${esc(lvl())}</b>.</p>`, async () => {
+    const r = await post('printer-send', { id, level: lvl() }); toast(`Lulu print job ${r.jobId} created`); reload(); });
+  go('#lulu-refresh', 'printer-refresh', null, r => { toast('Lulu status: ' + r.status); reload(); });
+  const c = $('#lulu-cancel');
+  if (c) c.onclick = () => openDialog('<h2>Cancel the Lulu print job?</h2><p>Only possible before it is paid.</p>', async () => { await post('printer-cancel', { id }); toast('Print job cancelled'); reload(); });
 }
 function confirmTracking(o) { return true; }
 

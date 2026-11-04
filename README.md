@@ -1,4 +1,4 @@
-# BOOKD — v1.7
+# BOOKD — v1.8
 
 Public site (5 languages) + performer portal + admin back office (English).
 
@@ -11,7 +11,7 @@ Public site (5 languages) + performer portal + admin back office (English).
 ## What's new in v1.1
 - **Admin** (`/admin`): orders pipeline, order sheet (customer, package, copies, price, payments, shipping, printer & tracking, notes, timeline), website messages (convert to order), team accounts.
 - **Performer portal**: profile, shipping address, shoots with credits + story, photo uploads (low-res flagged, not blocked), cover choice, "Send for layout".
-- **Proofs**: one click builds the layout + print PDFs (interior 8.125 x 10.25 in with bleed, and front cover). The performer flips the proof online, comments per page, then approves (accepting flagged photos) or asks for changes. Nothing prints before approval.
+- **Proofs**: one click builds the layout + print PDFs to Lulu's specs (interior 8.75 x 11.25 in = US Letter + bleed, and the full wrap-around cover). The performer flips the proof online, comments per page, then approves (accepting flagged photos) or asks for changes. Nothing prints before approval.
 - **Emails** (Resend): portal link, proof ready, shipped (to the performer); photos submitted, proof approved / changes (to you).
 - Contact-form messages are now also saved in the admin "Messages".
 
@@ -27,11 +27,11 @@ Public site (5 languages) + performer portal + admin back office (English).
 6. In **Team**, add Leila with a temporary password.
 
 ## Daily flow
-Message or new order → **Email link to customer** → performer fills the portal and presses **Send for layout** → you get an email → **Build new proof** → check the PDFs → **Send to customer** → performer approves → set status **Printing**, upload the PDFs to the printer, note the printer order # → set **Shipped** with the tracking # (the performer gets an email).
+Message or new order → **Email link to customer** → performer fills the portal and presses **Send for layout** → you get an email → **Build new proof** → check the PDFs → **Send to customer** → performer approves → **Print with Lulu → Get Lulu price → Send to Lulu** → pay the job in Lulu → Print Jobs (if Lulu shows it as unpaid) → **Refresh status**: when Lulu reports SHIPPED, the order moves to Shipped, the tracking is saved and the performer gets the shipping email.
 
 ## Notes
-- Print PDFs follow the Blurb 8x10 Standard Portrait interior size. The full wrap-around cover (front + spine + back) depends on the printer and page count; use the front-cover PDF with the printer's cover template for now.
-- Prices come from the cost model v6 (`lib/pricing.js`).
+- Print PDFs follow Lulu's photo book specs: US Letter 8.5 x 11 in, premium colour, 80# white coated, glossy cover. The cover size comes from Lulu for each page count.
+- Prices are in `lib/pricing.js` (unchanged from cost model v6; Lulu print costs are in cost model v7).
 
 ## v1.2
 - Works with Blob stores connected through OIDC (no read-write token): uploads then go through the site (max ~4 MB per photo). With `BLOB_READ_WRITE_TOKEN` present, large originals upload straight to Blob.
@@ -55,3 +55,20 @@ Message or new order → **Email link to customer** → performer fills the port
 - Spanish, Portuguese and Italian versions of the last two untranslated shoot titles.
 - Screen-reader labels (book arrows, language menu, 3D books) translated into all 5 languages.
 - First admin sign-in on a brand-new database no longer fails if two requests arrive at once.
+
+## v1.8 — Lulu
+- **Printer: Lulu Print API.** New "Print with Lulu" panel on each order: Lulu price (books + shipping + fee + tax), **Send to Lulu** (only once the customer has approved a proof), Refresh status, Cancel (before payment). Status SHIPPED from Lulu → order Shipped + tracking + shipping email.
+- **Format: US Letter 8.5 x 11 in** (Lulu has no 8 x 10). Interior PDF 8.75 x 11.25 in with bleed; full wrap-around cover (back + spine + front) sized by Lulu's cover-dimensions API.
+- Lulu minimums: softcover 32 pages, hardcover 24. Proofs are padded with blank pages before the closing page (the admin shows a warning). **Essentiel is now 32 pages** (site, all 5 languages).
+- Public site: "8.5 × 11", "premium coated paper", shipping estimates from Lulu rates (cost model v7). Prices unchanged.
+- Portal: country and state hints, phone required (couriers need it). Country names in EN/FR/ES/PT/IT or 2-letter codes are converted for Lulu.
+
+### New environment variables (Vercel → bookd → Settings → Environment Variables)
+| Name | Value |
+|---|---|
+| `LULU_CLIENT_KEY` | Client key from developers.**sandbox**.lulu.com → API Keys (test) or developers.lulu.com (live) |
+| `LULU_CLIENT_SECRET` | Client secret from the same page |
+| `LULU_ENV` | `sandbox` for tests, `production` to really print |
+| `LULU_CONTACT_EMAIL` | Email Lulu contacts about print jobs (optional, default CONTACT_TO) |
+
+Sandbox jobs are never printed and are paid with a test card in the sandbox Print Jobs page. Switch to live = change the three LULU_ values to the production keys + `production`, then redeploy.

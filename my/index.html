@@ -70,7 +70,7 @@ textarea{min-height:90px;resize:vertical}
 /* proof spreads */
 .spread{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:0 auto 22px;max-width:760px}
 .spread > .pg{box-shadow:0 20px 50px -30px rgba(0,0,0,.5)}
-.pg{aspect-ratio:8/10;background:var(--page);color:var(--page-ink);container-type:inline-size;position:relative;overflow:hidden;cursor:pointer}
+.pg{aspect-ratio:8.5/11;background:var(--page);color:var(--page-ink);container-type:inline-size;position:relative;overflow:hidden;cursor:pointer}
 .pg.sel{outline:3px solid var(--accent);outline-offset:-3px}
 .pg .in{position:absolute;inset:8cqw;display:flex;flex-direction:column}
 .pg img.full{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
@@ -156,10 +156,10 @@ function paneShip() {
   const s = D.order.ship;
   $('#pane').innerHTML = `<form class="card" id="f">
     <h2>Where should we ship your book?</h2>
-    <div class="grid2"><label>Full name<input name="ship_name" value="${esc(s.ship_name)}" ${dis()}></label><label>Phone (for the courier)<input name="phone" value="${esc(s.phone)}" ${dis()}></label></div>
+    <div class="grid2"><label>Full name<input name="ship_name" value="${esc(s.ship_name)}" ${dis()}></label><label>Phone (for the courier)<input name="phone" type="tel" value="${esc(s.phone)}" required ${dis()}></label></div>
     <label>Street address<input name="ship_address" value="${esc(s.ship_address)}" ${dis()}></label>
-    <div class="grid2"><label>City<input name="ship_city" value="${esc(s.ship_city)}" ${dis()}></label><label>State / province<input name="ship_region" value="${esc(s.ship_region)}" ${dis()}></label></div>
-    <div class="grid2"><label>Postal code<input name="ship_postal" value="${esc(s.ship_postal)}" ${dis()}></label><label>Country<input name="ship_country" value="${esc(s.ship_country)}" ${dis()}></label></div>
+    <div class="grid2"><label>City<input name="ship_city" value="${esc(s.ship_city)}" ${dis()}></label><label>State / province<input name="ship_region" value="${esc(s.ship_region)}" placeholder="e.g. QC, NY" ${dis()}></label></div>
+    <div class="grid2"><label>Postal code<input name="ship_postal" value="${esc(s.ship_postal)}" ${dis()}></label><label>Country<input name="ship_country" value="${esc(s.ship_country)}" placeholder="e.g. Canada" ${dis()}></label></div>
     <div class="row"><button class="btn primary" ${dis()}>Save and continue</button></div></form>`;
   $('#f').onsubmit = async e => { e.preventDefault(); const ship = Object.fromEntries(new FormData(e.target)); await api('profile', { ship }); D.order.ship = { ...D.order.ship, ...ship }; toast('Saved'); step = 'shoots'; render(); };
 }
