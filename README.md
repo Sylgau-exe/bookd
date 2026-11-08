@@ -1,4 +1,4 @@
-# BOOKD — v1.23
+# BOOKD — v1.24
 
 Public site (5 languages) + performer portal + admin back office (English).
 
@@ -155,3 +155,8 @@ Test card: **4242 4242 4242 4242**, any future date, any CVC, any postal code. P
 ## v1.23 — Lulu print job fix
 - Fix: Lulu refused the print job ("printable_normalization.pod_package_id: This field is required"). The package code now sits inside `printable_normalization`, as the Lulu API requires. The delivery address always carries an email (the customer's, otherwise LULU_CONTACT_EMAIL / CONTACT_TO), also required by Lulu.
 - Confirmation buttons now say what they do ("Send to Lulu", "Cancel the job", "Delete") instead of "Save".
+
+## v1.24 — Fonts embedded for Lulu
+- Fix: Lulu rejected print job 361222 ("One or more line-items were rejected"). The PDFs used the 14 standard PDF fonts, which are not embedded; Lulu requires every font to be embedded. The PDFs now embed Liberation Serif / Sans (free SIL OFL fonts in `fonts/`, same metrics as Times / Helvetica, so the pages look identical). New dependency: `@pdf-lib/fontkit`.
+- An approved proof made before this fix gets its print files regenerated automatically when you click "Send to Lulu" (same layout, same photos, approval kept).
+- "Refresh status" now shows Lulu's detailed reason when a job is rejected, and the panel explains how to resend.

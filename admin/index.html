@@ -449,6 +449,7 @@ function luluCard(d) {
       ${job ? `<button class="btn" type="button" id="lulu-refresh">Refresh status</button>${['CREATED', 'UNPAID'].includes(o.printer_status) ? '<button class="btn ghost" type="button" id="lulu-cancel">Cancel job</button>' : ''}` : ''}</div>`}
     ${job ? `<dl class="kv"><dt>Print job</dt><dd>${esc(o.printer_order_id)} <span class="muted small">(${esc(o.printer_env || '')})</span></dd><dt>Lulu status</dt><dd><b>${esc(o.printer_status || '—')}</b></dd>
       <dt>Lulu cost</dt><dd>${esc(o.printer_cost || '—')}</dd><dt>Tracking</dt><dd>${esc(o.tracking || '—')}</dd></dl>
+      ${['REJECTED', 'ERROR'].includes(o.printer_status) ? `<div class="warnbox"><b>Lulu rejected the files.</b> The reason is in the Timeline below. Once fixed, click “Send to Lulu” again: a new print job is created (the approved proof stays approved).</div>` : ''}
       ${o.printer_status === 'UNPAID' ? `<div class="warnbox">Lulu is waiting for payment. Open <a href="https://developers${o.printer_env === 'production' ? '' : '.sandbox'}.lulu.com/print-jobs" target="_blank" rel="noopener">Lulu → Print Jobs</a> and pay job ${esc(o.printer_order_id)}${o.printer_env === 'production' ? '' : ' with a test card'}.</div>` : ''}` : ''}
     <div id="lulu-out"></div>
   </section>`;

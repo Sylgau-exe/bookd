@@ -13,7 +13,7 @@ import * as lulu from '../../lib/lulu.js';
 import { TEMPLATES, templateKey } from '../../lib/templates.js';
 import { ORNAMENTS, ORNAMENT_COLORS, ornamentKey, ornamentColor } from '../../lib/ornaments.js';
 import { createOrder, balanceDue } from '../../lib/orders.js';
-import { buildProof } from '../../lib/proofs.js';
+import { buildProof, refreshPrintFiles } from '../../lib/proofs.js';
 import { hasStripe, stripeMode } from '../../lib/stripe.js';
 
 const token = () => crypto.randomBytes(24).toString('hex');
@@ -245,9 +245,11 @@ export default async function handler(req, res) {
         if (o.printer_order_id && /^Lulu/.test(o.printer || '') && !['CANCELED', 'REJECTED', 'ERROR'].includes(o.printer_status) && !body.force)
           return fail(res, 400, `Already sent to Lulu (print job ${o.printer_order_id}, ${o.printer_status || 'status unknown'}).`);
         const toAbs = (u) => /^https?:/.test(u) ? u : siteUrl(req) + u;
+        let pp;
+        try { pp = await refreshPrintFiles(p, o, siteUrl(req), who); } catch (e) { return fail(res, 500, 'Could not regenerate the print files: ' + e.message); }
         let job;
         try { job = await lulu.createJob({ ref: o.ref, title: `BOOKD — ${o.profile?.name || o.customer_name || o.ref}`, cover, quantity: o.copies || 1,
-          interiorUrl: toAbs(p.interior_url), coverUrl: toAbs(p.cover_url), address, level }); }
+          interiorUrl: toAbs(pp.interior_url), coverUrl: toAbs(pp.cover_url), address, level }); }
         catch (e) { await logEvent(o.id, who, 'Lulu refused the print job: ' + e.message); return fail(res, 400, e.message); }
         const env = lulu.luluEnv();
         await q(`UPDATE orders SET printer=$1, printer_order_id=$2, printer_status=$3, printer_env=$4, printer_cost=$5, ship_level=$6, printer_sent_at=now(),
@@ -265,7 +267,8 @@ export default async function handler(req, res) {
         const sets = ['printer_status=$1'], vals = [st];
         if (trackTxt) { vals.push(trackTxt); sets.push(`tracking=$${vals.length}`); }
         vals.push(o.id); await q(`UPDATE orders SET ${sets.join(', ')}, updated_at=now() WHERE id=$${vals.length}`, vals);
-        if (st !== o.printer_status) await logEvent(o.id, 'Lulu', `Print job ${o.printer_order_id}: ${o.printer_status || '—'} → ${st}${job.status?.message ? ' (' + clip(job.status.message, 300) + ')' : ''}`);
+        const why = lulu.problemsOf(job);
+        if (st !== o.printer_status || (why && st === 'REJECTED')) await logEvent(o.id, 'Lulu', `Print job ${o.printer_order_id}: ${o.printer_status || '—'} → ${st}${job.status?.message ? ' (' + clip(job.status.message, 300) + ')' : ''}${why ? ' — Lulu says: ' + clip(why, 900) : ''}`);
         if (st === 'SHIPPED' && !['shipped', 'delivered'].includes(o.status)) {
           await q(`UPDATE orders SET status='shipped', updated_at=now() WHERE id=$1`, [o.id]);
           await logEvent(o.id, 'system', 'Status: printing → shipped (Lulu)');
@@ -275,7 +278,7 @@ export default async function handler(req, res) {
             await logEvent(o.id, 'system', 'Shipping email sent to customer');
           }
         }
-        return res.json({ ok: true, status: st, message: job.status?.message || '', tracking: trackTxt });
+        return res.json({ ok: true, status: st, message: [job.status?.message, why].filter(Boolean).join(' — '), tracking: trackTxt });
       }
       case 'printer-cancel': {
         const o = await one('SELECT * FROM orders WHERE id=$1', [parseInt(body.id, 10)]); if (!o) return fail(res, 404, 'Order not found');

@@ -1,8 +1,8 @@
 {
   "cleanUrls": true,
   "functions": {
-    "api/admin/[action].js": { "maxDuration": 60 },
-    "api/portal/[action].js": { "maxDuration": 60 }
+    "api/admin/[action].js": { "maxDuration": 60, "includeFiles": "fonts/**" },
+    "api/portal/[action].js": { "maxDuration": 60, "includeFiles": "fonts/**" }
   },
   "headers": [
     { "source": "/admin/(.*)", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
