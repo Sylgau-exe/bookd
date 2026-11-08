@@ -6,6 +6,7 @@ import { savePublic, removePublic, canClientUpload } from '../../lib/storage.js'
 import { PACKAGES, isLowRes, isTooSmall, upgradeSurcharge } from '../../lib/pricing.js';
 import { KIND_LABELS } from '../../lib/layout.js';
 import { balanceDue } from '../../lib/orders.js';
+import { buildProof } from '../../lib/proofs.js';
 import { hasStripe } from '../../lib/stripe.js';
 
 const LOCKED = ['approved', 'printing', 'shipped', 'delivered', 'cancelled'];
@@ -37,18 +38,21 @@ export default async function handler(req, res) {
       const shoots = await q('SELECT id, position, kind, title, credits, story, credit_image, credit_image_kind FROM shoots WHERE order_id=$1 ORDER BY position, id', [order.id]);
       const photos = (await q('SELECT id, shoot_id, position, url, width, height, low_res, keep, role FROM photos WHERE order_id=$1 ORDER BY shoot_id, position, id', [order.id]))
         .map(p => ({ ...p, low_res: isLowRes(p.width, p.height), too_small: isTooSmall(p.width, p.height) }));
-      const proof = await one(`SELECT id, version, status, layout, interior_url, page_count, sent_at FROM proofs WHERE order_id=$1 AND status IN ('sent','approved','changes') ORDER BY version DESC LIMIT 1`, [order.id]);
+      const proof = await one(`SELECT id, version, status, layout, interior_url, page_count, sent_at, created_at FROM proofs WHERE order_id=$1 AND status IN ('sent','approved','changes') ORDER BY version DESC LIMIT 1`, [order.id]);
       const comments = proof ? await q('SELECT id, page, body, author, created_at FROM proof_comments WHERE proof_id=$1 ORDER BY created_at', [proof.id]) : [];
       const pkg = PACKAGES[order.package] || PACKAGES.signature;
       return res.json({ ok: true, uploadMode: canClientUpload() ? 'blob' : 'direct', kinds: KIND_LABELS,
         order: { ref: order.ref, status: order.status, locked, customer_name: order.customer_name, package: order.package, packageLabel: pkg.label, maxPhotos: pkg.maxPhotos, pages: pkg.pages, packages: Object.fromEntries(Object.entries(PACKAGES).map(([k, p]) => [k, { label: p.label, maxPhotos: p.maxPhotos, pages: p.pages, price: p.price, cover: p.cover, upgrade: p.maxPhotos > pkg.maxPhotos ? upgradeSurcharge(order.package, k, order.copies) : null }])), copies: order.copies,
-          profile: order.profile || {}, ship: Object.fromEntries(SHIP_KEYS.map(k => [k, order[k] || ''])), submitted_at: order.submitted_at,
+          content_at: order.content_at, profile: order.profile || {}, ship: Object.fromEntries(SHIP_KEYS.map(k => [k, order[k] || ''])), submitted_at: order.submitted_at,
           pay: { online: hasStripe(), price: order.price_usd == null ? null : +order.price_usd, shipping: order.shipping_usd == null ? null : +order.shipping_usd,
             paid: +(order.paid_usd || order.deposit_usd || 0), deposit_paid: !!order.deposit_paid, balance_paid: !!order.balance_paid, due: balanceDue(order) } },
         shoots, photos, proof, comments });
     }
     const body = req.method === 'POST' && !['upload', 'shoot-image'].includes(action) ? await readJson(req) : {};
     if (locked && !['proof-comment'].includes(action)) return fail(res, 403, 'This book is approved and locked. Write to us if you need a change.');
+    // remember when the performer last changed something that is printed (to offer "Update my proof")
+    if (['profile', 'shoot-save', 'shoot-delete', 'shoot-move', 'upload', 'photo-register', 'photo-delete', 'photo-cover', 'photo-move', 'shoot-image', 'shoot-image-delete', 'upgrade'].includes(action)
+      && !(action === 'profile' && !body.profile)) await q('UPDATE orders SET content_at=now() WHERE id=$1', [order.id]);
 
     switch (action) {
       case 'profile': {
@@ -157,6 +161,19 @@ export default async function handler(req, res) {
         await logEvent(order.id, 'customer', `Photos submitted for layout (${n} photos)`);
         await sendMail({ to: adminInbox(), subject: `[BOOKD] ${order.ref} — photos submitted for layout`, text: `${order.customer_name} sent ${n} photos for layout.\n\nOpen the admin: ${siteUrl(req)}/admin/#order/${order.id}` });
         return res.json({ ok: true });
+      }
+      case 'proof-refresh': { // the performer fixed their own text or photos: rebuild the proof and show it right away
+        const cur = await one(`SELECT * FROM proofs WHERE order_id=$1 AND status IN ('sent','changes') ORDER BY version DESC LIMIT 1`, [order.id]);
+        if (!cur) return fail(res, 400, 'There is no proof to update yet');
+        if (cur.created_at && Date.now() - new Date(cur.created_at).getTime() < 20000) return fail(res, 429, 'Your proof was just updated. Please wait a few seconds.');
+        let r; try { r = await buildProof(order.id, siteUrl(req), 'customer'); } catch (e) { if (e.status) return fail(res, e.status, e.message); throw e; }
+        await q(`UPDATE proofs SET status='sent', sent_at=now() WHERE id=$1`, [r.proofId]);
+        await q(`UPDATE proofs SET status='superseded' WHERE order_id=$1 AND id<>$2 AND status IN ('draft','sent','changes')`, [order.id, r.proofId]);
+        await q(`UPDATE orders SET status='proof_sent', updated_at=now() WHERE id=$1`, [order.id]);
+        await logEvent(order.id, 'customer', `Customer updated their details and refreshed the proof → v${r.version} (sent automatically)`);
+        await sendMail({ to: adminInbox(), subject: `[BOOKD] ${order.ref} — proof v${r.version} updated by the customer`,
+          text: `${order.customer_name} corrected their own details and refreshed the proof (v${r.version}). Nothing to do unless you want to check it.\n\n${siteUrl(req)}/admin/#order/${order.id}` });
+        return res.json({ ok: true, version: r.version });
       }
       case 'proof-comment': {
         const p = await one(`SELECT * FROM proofs WHERE id=$1 AND order_id=$2 AND status='sent'`, [parseInt(body.proofId, 10), order.id]);

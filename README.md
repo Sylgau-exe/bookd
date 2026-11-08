@@ -1,4 +1,4 @@
-# BOOKD — v1.19
+# BOOKD — v1.20
 
 Public site (5 languages) + performer portal + admin back office (English).
 
@@ -136,3 +136,8 @@ Test card: **4242 4242 4242 4242**, any future date, any CVC, any postal code. P
 - "Upgrade to [next package]" no longer opens a payment. One click (with a confirmation) switches the order to the bigger package and adds only the extra printing to the price: Lulu print difference + 30% markup, rounded up, per copy (Essentiel → Signature +$3, Signature → Prestige +$19, Essentiel → Prestige +$22). No extra design cost. It is paid with the balance after the proof is approved.
 - Values in `lib/pricing.js` (`PRINT_USD`, `UPGRADE_MARKUP`).
 - **New prices (USD):** Essentiel $129, **Signature $132**, **Prestige $151** (= Essentiel + the extra printing), so buying a bigger package directly costs the same as upgrading. Extra copies unchanged ($59 / $69 / $119). Website and back office updated.
+
+## v1.20 — The performer updates their own proof
+- After receiving a proof, the performer can still fix their own details or photos (About you, Shoots & photos). "Your proof" then shows **"You changed your details or photos after this proof"** with an **Update my proof** button: it rebuilds the proof with the same design, layout and decoration, sends it to them right away (new version), and emails the admin "proof updated by the customer" (nothing to do).
+- No need to go through "Ask for changes" for their own mistakes. "Ask for changes" stays for what only the admin can change.
+- New file `lib/proofs.js` (shared proof builder). `vercel.json`: the portal function may run up to 60 s (building the PDFs).

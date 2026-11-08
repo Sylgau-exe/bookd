@@ -380,6 +380,12 @@ function pageHtml(p, idx) {
   if (p.type === 'closing') return `<div class="pg closing${sel}" data-page="${n}">${ornSvg('closing')}<div class="in"><div class="ttl">${esc(p.name)}</div><div class="kind">${esc(p.contact)}</div><div class="kind">${esc(p.website)}</div></div>${badge}</div>`;
   return `<div class="pg blank" data-page="${n}"></div>`;
 }
+function refreshBox(P) {
+  if (!P || !['sent', 'changes'].includes(P.status) || D.order.locked) return '';
+  const changed = D.order.content_at && P.created_at && new Date(D.order.content_at) > new Date(P.created_at);
+  if (!changed) return `<p class="small muted">Spotted your own typo or want another photo? Fix it in “About you” or “Shoots & photos”, then come back here and press “Update my proof”.</p>`;
+  return `<div class="warn" style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap"><span>You changed your details or photos after this proof. Update it to see your changes in the book.</span><button class="btn primary" id="refresh" type="button">Update my proof</button></div>`;
+}
 function payBox() {
   const p = D.order.pay || {};
   if (!p.online || p.price == null) return '';
@@ -396,6 +402,7 @@ function paneProof() {
   const spreads = []; spreads.push([null, pages[0]]); for (let i = 1; i < pages.length; i += 2) spreads.push([pages[i], pages[i + 1]]);
   $('#pane').innerHTML = `<div class="card">
     <div class="row" style="justify-content:space-between"><h2>Your proof — version ${P.version}</h2><a class="btn ghost" href="${esc(P.interior_url)}" target="_blank" rel="noopener">Download PDF ↗</a></div>
+    ${refreshBox(P)}
     ${P.status === 'approved' ? `<div class="ok">You approved this proof. We’re sending it to print.</div>${payBox()}` : P.status === 'changes' ? `<div class="warn">You asked for changes. We’ll send you a new version soon.</div>` : `<p class="muted">Flip through your book below. Tap a page to comment on it. When you’re happy, approve it at the bottom. Nothing is printed before you approve.</p>`}
     ${L.cover ? `<div><div class="eyebrow" style="margin-bottom:6px">Cover</div><div class="pg cover-prev" style="cursor:default"><img class="full" src="${esc(L.cover.url)}" alt=""><div class="in" style="justify-content:flex-end;color:#fff"><div class="ttl" style="font-size:10cqw">${esc(L.cover.name)}</div><div class="kind" style="color:#fff">${esc(L.cover.role)}</div></div></div></div>` : ''}
     <div id="spreads" class="${tplClass(L.theme)}" style="${tplVars(L.theme)}">${spreads.map(([a, b], i) => `<div class="spread">${a ? pageHtml(a, pages.indexOf(a)) : '<div aria-hidden="true"></div>'}${b ? pageHtml(b, pages.indexOf(b)) : '<div aria-hidden="true"></div>'}</div>`).join('')}</div>
@@ -407,6 +414,8 @@ function paneProof() {
       <div class="row"><button class="btn primary" id="approve">Approve for print</button><button class="btn" id="changes">Ask for changes</button></div></div>` : ''}
   </div>`;
   $('#spreads').onclick = e => { const pg = e.target.closest('[data-page]'); if (!pg || !open) return; selPage = +pg.dataset.page === selPage ? null : +pg.dataset.page; paneProof(); $('#cbox')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); };
+  $('#refresh') && ($('#refresh').onclick = async () => { const b = $('#refresh'); b.disabled = true; b.textContent = 'Updating your book… (about 20 seconds)';
+    try { const r = await api('proof-refresh', {}); toast(`Proof updated — version ${r.version}`); await load(); step = 'proof'; render(); } catch (e) { toast(e.message); b.disabled = false; b.textContent = 'Update my proof'; } });
   $('#paybal') && ($('#paybal').onclick = async () => { const b = $('#paybal'); b.disabled = true; b.textContent = 'Opening secure payment…';
     try { const r = await fetch(`/api/checkout?action=balance&t=${encodeURIComponent(T)}`, { method: 'POST' }); const j = await r.json(); if (!r.ok || !j.url) throw new Error(j.error || 'Payment unavailable'); location.href = j.url; } catch (e) { toast(e.message); b.disabled = false; b.textContent = 'Pay the balance'; } });
   if (!open) return;

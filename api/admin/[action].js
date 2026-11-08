@@ -13,6 +13,7 @@ import * as lulu from '../../lib/lulu.js';
 import { TEMPLATES, templateKey } from '../../lib/templates.js';
 import { ORNAMENTS, ORNAMENT_COLORS, ornamentKey, ornamentColor } from '../../lib/ornaments.js';
 import { createOrder, balanceDue } from '../../lib/orders.js';
+import { buildProof } from '../../lib/proofs.js';
 import { hasStripe, stripeMode } from '../../lib/stripe.js';
 
 const token = () => crypto.randomBytes(24).toString('hex');
@@ -202,19 +203,9 @@ export default async function handler(req, res) {
         return res.json({ ok: true, layout: buildLayout(d.order, d.shoots, d.photos) });
       }
       case 'build-proof': {
-        const d = await loadOrder(parseInt(body.id, 10)); if (!d) return fail(res, 404, 'Order not found');
-        const layout = buildLayout(d.order, d.shoots, d.photos);
-        if (!layout.cover) return fail(res, 400, 'Add photos before building a proof');
-        layout.coverDims = await lulu.coverDimensions(layout.binding, layout.pageCount);
-        const pdf = await buildPdfs(layout, siteUrl(req));
-        const version = (d.proofs[0]?.version || 0) + 1;
-        const interior_url = await savePublic(`proofs/${d.order.ref}/v${version}-interior.pdf`, pdf.interior, 'application/pdf');
-        const cover_url = await savePublic(`proofs/${d.order.ref}/v${version}-cover.pdf`, pdf.cover, 'application/pdf');
-        const p = await one(`INSERT INTO proofs (order_id, version, status, layout, interior_url, cover_url, page_count) VALUES ($1,$2,'draft',$3,$4,$5,$6) RETURNING id`,
-          [d.order.id, version, JSON.stringify(layout), interior_url, cover_url, pdf.pageCount]);
-        await q(`UPDATE orders SET status = CASE WHEN status IN ('new','collecting','changes') THEN 'layout' ELSE status END, updated_at=now() WHERE id=$1`, [d.order.id]);
-        await logEvent(d.order.id, who, `Proof v${version} built (${pdf.pageCount} pages, cover ${(pdf.coverSize.width / 72).toFixed(3)} x ${(pdf.coverSize.height / 72).toFixed(3)} in${layout.coverDims.source === 'lulu' ? ' from Lulu' : ' estimated'})`);
-        return res.json({ ok: true, proofId: p.id, version, warnings: layout.warnings, interior_url, cover_url });
+        let r; try { r = await buildProof(parseInt(body.id, 10), siteUrl(req), who); } catch (e) { if (e.status) return fail(res, e.status, e.message); throw e; }
+        await q(`UPDATE orders SET status = CASE WHEN status IN ('new','collecting','changes') THEN 'layout' ELSE status END, updated_at=now() WHERE id=$1`, [r.order.id]);
+        return res.json({ ok: true, proofId: r.proofId, version: r.version, warnings: r.warnings, interior_url: r.interior_url, cover_url: r.cover_url });
       }
       case 'send-proof': {
         const p = await one('SELECT * FROM proofs WHERE id=$1', [parseInt(body.proofId, 10)]); if (!p) return fail(res, 404, 'Proof not found');
