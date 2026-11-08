@@ -1,4 +1,4 @@
-# BOOKD — v1.20
+# BOOKD — v1.21
 
 Public site (5 languages) + performer portal + admin back office (English).
 
@@ -141,3 +141,7 @@ Test card: **4242 4242 4242 4242**, any future date, any CVC, any postal code. P
 - After receiving a proof, the performer can still fix their own details or photos (About you, Shoots & photos). "Your proof" then shows **"You changed your details or photos after this proof"** with an **Update my proof** button: it rebuilds the proof with the same design, layout and decoration, sends it to them right away (new version), and emails the admin "proof updated by the customer" (nothing to do).
 - No need to go through "Ask for changes" for their own mistakes. "Ask for changes" stays for what only the admin can change.
 - New file `lib/proofs.js` (shared proof builder). `vercel.json`: the portal function may run up to 60 s (building the PDFs).
+
+## v1.21 — Reading copy in double pages
+- Each proof now also produces a **book preview PDF**: page 1 = the open cover (back, spine, front), then double pages trimmed to the final size, first page alone on the right like a real book. Opens as spreads in any PDF viewer.
+- Performer portal: **Download PDF (double pages)** opens this preview. Admin: **Book preview (spreads) ↗** next to the Interior and Cover PDFs. The print files sent to Lulu are unchanged.

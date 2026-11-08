@@ -401,7 +401,7 @@ function paneProof() {
   const flagged = pages.filter(p => p.lowRes).length;
   const spreads = []; spreads.push([null, pages[0]]); for (let i = 1; i < pages.length; i += 2) spreads.push([pages[i], pages[i + 1]]);
   $('#pane').innerHTML = `<div class="card">
-    <div class="row" style="justify-content:space-between"><h2>Your proof — version ${P.version}</h2><a class="btn ghost" href="${esc(P.interior_url)}" target="_blank" rel="noopener">Download PDF ↗</a></div>
+    <div class="row" style="justify-content:space-between"><h2>Your proof — version ${P.version}</h2><a class="btn ghost" href="${esc(P.preview_url || P.interior_url)}" target="_blank" rel="noopener">Download PDF (double pages) ↗</a></div>
     ${refreshBox(P)}
     ${P.status === 'approved' ? `<div class="ok">You approved this proof. We’re sending it to print.</div>${payBox()}` : P.status === 'changes' ? `<div class="warn">You asked for changes. We’ll send you a new version soon.</div>` : `<p class="muted">Flip through your book below. Tap a page to comment on it. When you’re happy, approve it at the bottom. Nothing is printed before you approve.</p>`}
     ${L.cover ? `<div><div class="eyebrow" style="margin-bottom:6px">Cover</div><div class="pg cover-prev" style="cursor:default"><img class="full" src="${esc(L.cover.url)}" alt=""><div class="in" style="justify-content:flex-end;color:#fff"><div class="ttl" style="font-size:10cqw">${esc(L.cover.name)}</div><div class="kind" style="color:#fff">${esc(L.cover.role)}</div></div></div></div>` : ''}

@@ -27,7 +27,7 @@ async function loadOrder(id) {
   const shoots = await q('SELECT * FROM shoots WHERE order_id=$1 ORDER BY position, id', [id]);
   const photos = (await q('SELECT * FROM photos WHERE order_id=$1 ORDER BY shoot_id, position, id', [id]))
     .map(p => ({ ...p, low_res: isLowRes(p.width, p.height), too_small: isTooSmall(p.width, p.height) }));
-  const proofs = await q('SELECT id, version, status, interior_url, cover_url, page_count, layout, sent_at, decided_at, created_at FROM proofs WHERE order_id=$1 ORDER BY version DESC', [id]);
+  const proofs = await q('SELECT id, version, status, interior_url, cover_url, preview_url, page_count, layout, sent_at, decided_at, created_at FROM proofs WHERE order_id=$1 ORDER BY version DESC', [id]);
   const comments = proofs.length ? await q('SELECT * FROM proof_comments WHERE proof_id = ANY($1::int[]) ORDER BY created_at', [proofs.map(p => p.id)]) : [];
   const events = await q('SELECT * FROM events WHERE order_id=$1 ORDER BY created_at DESC LIMIT 100', [id]);
   return { order, shoots, photos, proofs, comments, events };
@@ -126,7 +126,7 @@ export default async function handler(req, res) {
         const oid = parseInt(body.id, 10);
         const files = [...(await q('SELECT url FROM photos WHERE order_id=$1', [oid])).map(r => r.url),
           ...(await q('SELECT credit_image FROM shoots WHERE order_id=$1', [oid])).map(r => r.credit_image),
-          ...(await q('SELECT interior_url, cover_url FROM proofs WHERE order_id=$1', [oid])).flatMap(r => [r.interior_url, r.cover_url])].filter(Boolean);
+          ...(await q('SELECT interior_url, cover_url, preview_url FROM proofs WHERE order_id=$1', [oid])).flatMap(r => [r.interior_url, r.cover_url, r.preview_url])].filter(Boolean);
         await q('DELETE FROM orders WHERE id=$1', [oid]);
         for (const f of files) await removePublic(f);
         await q('UPDATE messages SET order_id=NULL WHERE order_id=$1', [oid]);
