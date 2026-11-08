@@ -57,13 +57,22 @@ textarea{min-height:90px;resize:vertical}
 .credits{display:grid;gap:8px}
 .cr{display:grid;grid-template-columns:150px 1fr auto;gap:8px}
 @media (max-width:640px){.cr{grid-template-columns:1fr 1fr auto}}
-.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
-.th{position:relative;border-radius:8px;overflow:hidden;aspect-ratio:4/5;background:var(--bg);border:1px solid var(--rule)}
-.th img{width:100%;height:100%;object-fit:cover;display:block}
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.th{position:relative;border-radius:8px;overflow:hidden;background:var(--bg);border:1px solid var(--rule)}
+.th img{width:100%;aspect-ratio:4/5;object-fit:cover;display:block}
 .th .tag{position:absolute;left:5px;top:5px;font-family:var(--mono);font-size:.62rem;padding:2px 6px;border-radius:4px;background:var(--warn);color:#fff}
 .th .tag.cv{left:auto;right:5px;background:var(--accent)}
-.th .ops{position:absolute;inset:auto 0 0;display:flex;justify-content:space-between;background:linear-gradient(transparent,rgba(0,0,0,.7));padding:16px 4px 4px}
-.th .ops button{background:none;border:0;color:#fff;font-size:.72rem;cursor:pointer;padding:3px 5px}
+.th .ops{display:flex;justify-content:space-between;align-items:center;padding:4px;gap:2px}
+.th .ops button{background:none;border:0;color:var(--ink);font-size:.82rem;font-weight:600;cursor:pointer;padding:5px 7px;border-radius:6px}
+.th .ops button:hover{background:var(--rule)}
+.th .ops button:disabled{opacity:.3;cursor:default}
+.th .ops .cvb{color:var(--accent)}
+.th.is-cover{outline:3px solid var(--accent);outline-offset:-3px}
+.guide{background:var(--bg);border-radius:10px;padding:12px 16px;font-size:.9rem}
+.guide ol{margin:6px 0 0;padding-left:20px;display:grid;gap:4px}
+.coverbox{display:flex;gap:14px;align-items:center;background:var(--bg);border-radius:10px;padding:10px 14px}
+.coverbox .cv{width:72px;aspect-ratio:4/5;border-radius:6px;background:var(--rule) center/cover no-repeat;flex:none}
+.shoot-order{display:flex;gap:6px}
 .th.up{display:grid;place-items:center;font-size:.8rem;color:var(--muted);text-align:center;padding:8px}
 .drop{border:1.5px dashed var(--rule);border-radius:10px;padding:16px;text-align:center;color:var(--muted);cursor:pointer}
 .drop.over{border-color:var(--accent);background:var(--accent-soft)}
@@ -90,6 +99,14 @@ textarea{min-height:90px;resize:vertical}
 .pg.blank{background:repeating-linear-gradient(45deg,#E9E4DA 0 10px,#E2DCD0 10px 20px)}
 .pg.closing .in{align-items:center;justify-content:center;text-align:center;gap:3cqw}
 .cover-prev{max-width:260px}
+/* book designs (templates) */
+.tpl-sans .pg .ttl,.tpl-sans .pg .num,.tpl-sans .pg .story{font-family:var(--sans,system-ui,sans-serif)}
+.tpl-sans .pg .num,.tpl-sans .pg .ttl{font-style:normal;font-weight:700}
+.tpl-sans .pg .story{font-style:italic}
+.tpl-upper .pg .ttl{text-transform:uppercase;letter-spacing:.02em}
+.tpl-thin .pg .num{font-size:4.5cqw;font-weight:400;font-style:normal;line-height:1}
+.tpl-thin .pg .ttl{font-weight:400;font-size:5cqw}
+.tpl-thin .pg .story{border-top-width:.15cqw;width:auto}
 .comments{display:grid;gap:8px}
 .cm{background:var(--bg);border-radius:8px;padding:8px 12px;font-size:.9rem}
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:.9rem;z-index:50}
@@ -169,12 +186,38 @@ function paneShip() {
 }
 /* 03 shoots */
 const CREDIT_DEFAULTS = ['Photographer', 'Makeup', 'Hair', 'Styling', 'Location', 'Date'];
+function coverBox() {
+  const c = D.photos.find(p => p.role === 'cover'), first = D.photos[0];
+  if (!first) return '';
+  return `<div class="coverbox"><div class="cv" style="background-image:url('${esc((c || first).url)}')"></div><div><b>Your cover</b><div class="small muted">${c ? 'This photo goes on the front of your book. To change it, press ★ Cover under another photo.' : 'Not chosen yet: the first photo will be used. Press ★ Cover under the photo you want.'}</div></div></div>`;
+}
+async function movePhoto(shootId, photoId, dir) {
+  const ph = D.photos.filter(p => p.shoot_id === shootId); const i = ph.findIndex(p => p.id === photoId), j = i + dir;
+  if (i < 0 || j < 0 || j >= ph.length) return;
+  [ph[i], ph[j]] = [ph[j], ph[i]];
+  await api('photo-move', { order: ph.map(p => p.id) });
+  ph.forEach((p, k) => p.position = k + 1);
+  D.photos = [...D.photos.filter(p => p.shoot_id !== shootId), ...ph].sort((a, b) => D.shoots.findIndex(s => s.id === a.shoot_id) - D.shoots.findIndex(s => s.id === b.shoot_id) || a.position - b.position);
+  render();
+}
+async function moveShoot(shootId, dir) {
+  const i = D.shoots.findIndex(s => s.id === shootId), j = i + dir; if (j < 0 || j >= D.shoots.length) return;
+  [D.shoots[i], D.shoots[j]] = [D.shoots[j], D.shoots[i]];
+  await api('shoot-move', { order: D.shoots.map(s => s.id) }); render();
+}
 function paneShoots() {
   const kept = D.photos.length;
   $('#pane').innerHTML = `<div class="card">
     <div class="row" style="justify-content:space-between"><h2>Shoots & photos</h2><span class="small muted">${kept} / ${D.order.maxPhotos} photos</span></div>
-    <div class="note">Add one section per shoot, show or event: who took part, where and when, and a few words about that day. Then add the photos. Runway, on-set and stage photos are welcome. Photos that are too small for a full page get a <b>LOW RES</b> badge and a smaller frame in the book; you decide at the proof whether they stay.</div>
-    <p class="small muted">Use the original files (JPG or PNG), not screenshots. Tap “Cover” on the photo you want on the front of your book.</p>
+    <div class="note">Every photo prints full page. Original files or Instagram downloads (1440 px wide) print well. Smaller photos get a <b>MAY PRINT SOFT</b> or <b>TOO SMALL</b> badge: ask the photographer for the original, or keep them anyway; you decide at the proof.</div>
+    <div class="guide"><b>How to build your book</b><ol>
+      <li><b>One section per shoot</b> (or show, or event): press “+ Add a shoot”, fill in the credits and a few words about that day.</li>
+      <li><b>Upload all the photos of that shoot at once</b>: select several files together. Use the original files (JPG or PNG), not screenshots.</li>
+      <li><b>Choose your cover:</b> press <b>★ Cover</b> under the photo you want on the front. You don’t upload a separate cover photo. The cover photo isn’t repeated inside the book. If you don’t choose, the first photo is used.</li>
+      <li><b>Set the order:</b> the order on screen is the order in the book. Use <b>◀ ▶</b> to move a photo, and <b>↑ ↓</b> to move a whole shoot.</li>
+      <li>When everything is in, press <b>Send for layout</b>. After your proof, you can still change the order until you approve it: change it here, then press “Ask for changes” on the proof and we send you a new version.</li>
+    </ol></div>
+    ${coverBox()}
     <div id="shoots" style="display:grid;gap:14px"></div>
     <div class="row"><button class="btn" id="add-shoot" ${dis()}>+ Add a shoot</button></div>
     ${kept > D.order.maxPhotos ? `<div class="warn">You have more photos than your package includes (${D.order.maxPhotos}). We’ll ask you which to leave out, or you can upgrade your package.</div>` : ''}
@@ -200,10 +243,10 @@ function shootCard(s) {
     <div><div class="small muted" style="margin-bottom:6px">Credits</div><div class="credits">${credits.map(c => `<div class="cr"><input data-cl value="${esc(c.label)}" placeholder="Role" ${dis()}><input data-cv value="${esc(c.value)}" placeholder="Name / detail" ${dis()}><button class="btn ghost" data-rmcr type="button" ${dis()}>✕</button></div>`).join('')}</div>
     <button class="btn ghost small" data-addcr type="button" ${dis()}>+ Add a credit</button></div>
     <label>The story — fun, difficult, demanding? A few words about that day<textarea name="story" maxlength="800" ${dis()}>${esc(s.story)}</textarea></label>
-    <div class="thumbs">${ph.map(p => `<div class="th"><img src="${esc(p.url)}" alt="" loading="lazy">${p.low_res ? '<span class="tag">LOW RES</span>' : ''}${p.role === 'cover' ? '<span class="tag cv">COVER</span>' : ''}
-      ${D.order.locked ? '' : `<div class="ops"><button data-del="${p.id}" type="button">Remove</button><button data-cover="${p.id}" type="button">Cover</button></div>`}</div>`).join('')}<div class="up-slot"></div></div>
+    <div class="thumbs">${ph.map((p, k) => `<div class="th${p.role === 'cover' ? ' is-cover' : ''}"><img src="${esc(p.url)}" alt="" loading="lazy">${p.too_small ? '<span class="tag">TOO SMALL</span>' : p.low_res ? '<span class="tag">MAY PRINT SOFT</span>' : ''}${p.role === 'cover' ? '<span class="tag cv">COVER</span>' : ''}
+      ${D.order.locked ? '' : `<div class="ops"><button data-left="${p.id}" type="button" title="Move earlier" ${k === 0 ? 'disabled' : ''}>◀</button><button data-cover="${p.id}" type="button" class="cvb">${p.role === 'cover' ? '★ Cover' : '☆ Cover'}</button><button data-right="${p.id}" type="button" title="Move later" ${k === ph.length - 1 ? 'disabled' : ''}>▶</button><button data-del="${p.id}" type="button" title="Remove">✕</button></div>`}</div>`).join('')}<div class="up-slot"></div></div>
     ${D.order.locked ? '' : `<label class="drop" tabindex="0"><input type="file" accept="image/jpeg,image/png" multiple hidden><span>Add photos — tap to choose, or drop them here</span></label>`}
-    <div class="row" style="justify-content:space-between"><button class="btn" data-save type="button" ${dis()}>Save this shoot</button><button class="btn ghost" data-delshoot type="button" ${dis()}>Delete shoot</button></div>`;
+    <div class="row" style="justify-content:space-between"><button class="btn" data-save type="button" ${dis()}>Save this shoot</button><span class="shoot-order"><button class="btn ghost small" data-sup type="button" ${dis()} title="Move this shoot earlier">↑ Move up</button><button class="btn ghost small" data-sdown type="button" ${dis()} title="Move this shoot later">↓ Move down</button></span><button class="btn ghost" data-delshoot type="button" ${dis()}>Delete shoot</button></div>`;
   const collect = () => ({ id: s.id, kind: $('[name=kind]', el).value, title: $('[name=title]', el).value, story: $('[name=story]', el).value,
     credits: [...el.querySelectorAll('.cr')].map(r => ({ label: $('[data-cl]', r).value, value: $('[data-cv]', r).value })) });
   const save = async (quiet) => { const v = collect(); await api('shoot-save', v); Object.assign(s, v); if (!quiet) toast('Shoot saved'); };
@@ -214,6 +257,10 @@ function shootCard(s) {
     else if (t.matches('[data-addcr]')) { const r = document.createElement('div'); r.className = 'cr'; r.innerHTML = `<input data-cl placeholder="Role"><input data-cv placeholder="Name / detail"><button class="btn ghost" data-rmcr type="button">✕</button>`; $('.credits', el).appendChild(r); }
     else if (t.matches('[data-rmcr]')) { t.closest('.cr').remove(); save(true); }
     else if (t.matches('[data-delshoot]')) { if (!confirmInline(t, 'Delete this shoot and its photos?')) return; await api('shoot-delete', { id: s.id }); D.shoots = D.shoots.filter(x => x.id !== s.id); D.photos = D.photos.filter(p => p.shoot_id !== s.id); render(); }
+    else if (t.dataset.left) movePhoto(s.id, +t.dataset.left, -1);
+    else if (t.dataset.right) movePhoto(s.id, +t.dataset.right, 1);
+    else if (t.matches('[data-sup]')) moveShoot(s.id, -1);
+    else if (t.matches('[data-sdown]')) moveShoot(s.id, 1);
     else if (t.dataset.del) { await api('photo-delete', { id: +t.dataset.del }); D.photos = D.photos.filter(p => p.id !== +t.dataset.del); render(); }
     else if (t.dataset.cover) { await api('photo-cover', { id: +t.dataset.cover }); D.photos.forEach(p => p.role = p.id === +t.dataset.cover ? 'cover' : null); toast('Cover photo chosen'); render(); }
   };
@@ -255,19 +302,22 @@ async function uploadFiles(shoot, files, el) {
         photo = (await api('upload', null, { query: `&shoot=${shoot.id}`, raw: f, headers: { 'Content-Type': f.type, 'X-Width': String(w), 'X-Height': String(h), 'X-Filename': encodeURIComponent(f.name) } })).photo;
       }
       D.photos.push(photo);
-      tile.innerHTML = `<img src="${esc(photo.url)}" alt="">${photo.low_res ? '<span class="tag">LOW RES</span>' : ''}`; tile.className = 'th';
+      tile.innerHTML = `<img src="${esc(photo.url)}" alt="">${photo.too_small ? '<span class="tag">TOO SMALL</span>' : photo.low_res ? '<span class="tag">MAY PRINT SOFT</span>' : ''}`; tile.className = 'th';
     } catch (e) { tile.textContent = '⚠ ' + e.message; }
   }
   setTimeout(render, 400);
 }
 
 /* 04 proof */
+function tplClass(t) { if (!t) return ''; return [t.titles !== 'serif' ? 'tpl-sans' : '', t.upper ? 'tpl-upper' : '', t.num === 'thin' ? 'tpl-thin' : ''].join(' '); }
+function tplVars(t) { return t ? `--page:${t.paper};--page-ink:${t.ink};--page-muted:${t.muted};--accent:${t.accent}` : ''; }
+function creditStyle(t, n) { if (!t || !t.palette) return ''; const c = t.palette[(n - 1) % t.palette.length]; return ` style="background:${c};--page-ink:#fff;--page-muted:rgba(255,255,255,.8);--accent:#fff;color:#fff"`; }
 function pageHtml(p, idx) {
   const n = idx + 1, side = n % 2 ? 'r' : 'l', fol = p.type === 'blank' ? '' : `<span class="fol ${side}">${String(n).padStart(2, '0')}</span>`;
   const cnt = D.comments.filter(c => c.page === n).length; const badge = cnt ? `<span class="cnt">${cnt} comment${cnt > 1 ? 's' : ''}</span>` : '';
   const sel = selPage === n ? ' sel' : '';
-  if (p.type === 'photo') return `<div class="pg${sel}" data-page="${n}"><img class="${p.mode}" src="${esc(p.url)}" alt="">${p.lowRes ? '<span class="lr">LOW RES</span>' : ''}${badge}${fol}</div>`;
-  if (p.type === 'credit') return `<div class="pg${sel}" data-page="${n}"><div class="in"><div class="num">${String(p.num).padStart(2, '0')}</div><div class="kind">${esc(p.kind)}</div><div class="ttl">${esc(p.title)}</div><dl>${p.credits.map(c => `<dt>${esc(c.label)}</dt><dd>${esc(c.value)}</dd>`).join('')}</dl>${p.story ? `<div class="story">${esc(p.story)}</div>` : ''}</div>${badge}${fol}</div>`;
+  if (p.type === 'photo') return `<div class="pg${sel}" data-page="${n}"><img class="${p.mode}" src="${esc(p.url)}" alt="">${p.tooSmall ? '<span class="lr">TOO SMALL</span>' : p.lowRes ? '<span class="lr">MAY PRINT SOFT</span>' : ''}${badge}${fol}</div>`;
+  if (p.type === 'credit') return `<div class="pg${sel}" data-page="${n}"${creditStyle(D.proof?.layout?.theme, p.num)}><div class="in"><div class="num">${String(p.num).padStart(2, '0')}</div><div class="kind">${esc(p.kind)}</div><div class="ttl">${esc(p.title)}</div><dl>${p.credits.map(c => `<dt>${esc(c.label)}</dt><dd>${esc(c.value)}</dd>`).join('')}</dl>${p.story ? `<div class="story">${esc(p.story)}</div>` : ''}</div>${badge}${fol}</div>`;
   if (p.type === 'bio') return `<div class="pg${sel}" data-page="${n}"><div class="in"><div class="ttl" style="font-size:8cqw">${esc(p.name)}</div><div class="kind">${esc(p.role)}</div><div class="bio">${esc(p.bio)}</div><dl style="margin-top:auto">${p.facts.map(f => `<dt>${esc(f[0])}</dt><dd>${esc(f[1])}</dd>`).join('')}</dl></div>${badge}${fol}</div>`;
   if (p.type === 'closing') return `<div class="pg closing${sel}" data-page="${n}"><div class="in"><div class="ttl">${esc(p.name)}</div><div class="kind">${esc(p.contact)}</div><div class="kind">${esc(p.website)}</div></div>${badge}</div>`;
   return `<div class="pg blank" data-page="${n}"></div>`;
@@ -290,11 +340,11 @@ function paneProof() {
     <div class="row" style="justify-content:space-between"><h2>Your proof — version ${P.version}</h2><a class="btn ghost" href="${esc(P.interior_url)}" target="_blank" rel="noopener">Download PDF ↗</a></div>
     ${P.status === 'approved' ? `<div class="ok">You approved this proof. We’re sending it to print.</div>${payBox()}` : P.status === 'changes' ? `<div class="warn">You asked for changes. We’ll send you a new version soon.</div>` : `<p class="muted">Flip through your book below. Tap a page to comment on it. When you’re happy, approve it at the bottom. Nothing is printed before you approve.</p>`}
     ${L.cover ? `<div><div class="eyebrow" style="margin-bottom:6px">Cover</div><div class="pg cover-prev" style="cursor:default"><img class="full" src="${esc(L.cover.url)}" alt=""><div class="in" style="justify-content:flex-end;color:#fff"><div class="ttl" style="font-size:10cqw">${esc(L.cover.name)}</div><div class="kind" style="color:#fff">${esc(L.cover.role)}</div></div></div></div>` : ''}
-    <div id="spreads">${spreads.map(([a, b], i) => `<div class="spread">${a ? pageHtml(a, pages.indexOf(a)) : '<div aria-hidden="true"></div>'}${b ? pageHtml(b, pages.indexOf(b)) : '<div aria-hidden="true"></div>'}</div>`).join('')}</div>
+    <div id="spreads" class="${tplClass(L.theme)}" style="${tplVars(L.theme)}">${spreads.map(([a, b], i) => `<div class="spread">${a ? pageHtml(a, pages.indexOf(a)) : '<div aria-hidden="true"></div>'}${b ? pageHtml(b, pages.indexOf(b)) : '<div aria-hidden="true"></div>'}</div>`).join('')}</div>
     ${open ? `<div class="card" style="background:var(--bg)" id="cbox"><h3>${selPage ? 'Comment on page ' + selPage : 'General comment'}</h3><textarea id="ctext" placeholder="What should we change?"></textarea><div class="row"><button class="btn" id="csend">Add comment</button>${selPage ? '<button class="btn ghost" id="cgen">Make it a general comment</button>' : ''}</div></div>` : ''}
     ${D.comments.length ? `<div class="comments"><h3>Comments</h3>${D.comments.map(c => `<div class="cm">${c.page ? `<b>Page ${c.page}:</b> ` : ''}${esc(c.body)}</div>`).join('')}</div>` : ''}
     ${open ? `<div class="card" style="background:var(--bg)"><h3>Your decision</h3>
-      ${flagged ? `<label class="chk"><input type="checkbox" id="acc"> I’ve seen the ${flagged} photo${flagged > 1 ? 's' : ''} marked LOW RES and I accept ${flagged > 1 ? 'them' : 'it'} as is.</label>` : ''}
+      ${flagged ? `<label class="chk"><input type="checkbox" id="acc"> I’ve seen the ${flagged} photo${flagged > 1 ? 's' : ''} marked MAY PRINT SOFT or TOO SMALL and I accept ${flagged > 1 ? 'them' : 'it'} as is.</label>` : ''}
       <label>Note (optional)<textarea id="dnote" style="min-height:60px"></textarea></label>
       <div class="row"><button class="btn primary" id="approve">Approve for print</button><button class="btn" id="changes">Ask for changes</button></div></div>` : ''}
   </div>`;

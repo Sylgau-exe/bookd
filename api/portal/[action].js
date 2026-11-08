@@ -3,7 +3,7 @@ import { q, one, ensureSchema, logEvent, hasDb } from '../../lib/db.js';
 import { readJson, readRaw, fail, clip, siteUrl, handle } from '../../lib/http.js';
 import { sendMail, adminInbox } from '../../lib/mail.js';
 import { savePublic, removePublic, canClientUpload } from '../../lib/storage.js';
-import { PACKAGES, isLowRes } from '../../lib/pricing.js';
+import { PACKAGES, isLowRes, isTooSmall } from '../../lib/pricing.js';
 import { KIND_LABELS } from '../../lib/layout.js';
 import { balanceDue } from '../../lib/orders.js';
 import { hasStripe } from '../../lib/stripe.js';
@@ -35,7 +35,8 @@ export default async function handler(req, res) {
 
     if (action === 'get') {
       const shoots = await q('SELECT id, position, kind, title, credits, story FROM shoots WHERE order_id=$1 ORDER BY position, id', [order.id]);
-      const photos = await q('SELECT id, shoot_id, position, url, width, height, low_res, keep, role FROM photos WHERE order_id=$1 ORDER BY shoot_id, position, id', [order.id]);
+      const photos = (await q('SELECT id, shoot_id, position, url, width, height, low_res, keep, role FROM photos WHERE order_id=$1 ORDER BY shoot_id, position, id', [order.id]))
+        .map(p => ({ ...p, low_res: isLowRes(p.width, p.height), too_small: isTooSmall(p.width, p.height) }));
       const proof = await one(`SELECT id, version, status, layout, interior_url, page_count, sent_at FROM proofs WHERE order_id=$1 AND status IN ('sent','approved','changes') ORDER BY version DESC LIMIT 1`, [order.id]);
       const comments = proof ? await q('SELECT id, page, body, author, created_at FROM proof_comments WHERE proof_id=$1 ORDER BY created_at', [proof.id]) : [];
       const pkg = PACKAGES[order.package] || PACKAGES.signature;
@@ -95,7 +96,7 @@ export default async function handler(req, res) {
         const pos = (await one('SELECT coalesce(max(position),0)+1 AS p FROM photos WHERE shoot_id=$1', [s.id])).p;
         const p = await one('INSERT INTO photos (order_id, shoot_id, position, url, filename, width, height, bytes, low_res) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *',
           [order.id, s.id, pos, url, clip(decodeURIComponent(req.headers['x-filename'] || ''), 200), w, h, buf.length, isLowRes(w, h)]);
-        return res.json({ ok: true, photo: p });
+        return res.json({ ok: true, photo: { ...p, too_small: isTooSmall(w, h) } });
       }
       case 'photo-register': { // after a direct-to-Blob upload
         const s = await ownShoot(body.shootId); if (!s) return fail(res, 404, 'Shoot not found');
@@ -104,7 +105,7 @@ export default async function handler(req, res) {
         const pos = (await one('SELECT coalesce(max(position),0)+1 AS p FROM photos WHERE shoot_id=$1', [s.id])).p;
         const p = await one('INSERT INTO photos (order_id, shoot_id, position, url, filename, width, height, bytes, low_res) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *',
           [order.id, s.id, pos, body.url, clip(body.filename, 200), w, h, parseInt(body.bytes, 10) || null, isLowRes(w, h)]);
-        return res.json({ ok: true, photo: p });
+        return res.json({ ok: true, photo: { ...p, too_small: isTooSmall(w, h) } });
       }
       case 'photo-delete': {
         const p = await one('SELECT * FROM photos WHERE id=$1 AND order_id=$2', [parseInt(body.id, 10), order.id]); if (!p) return fail(res, 404, 'Photo not found');

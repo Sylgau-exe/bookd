@@ -1,4 +1,4 @@
-# BOOKD — v1.9
+# BOOKD — v1.12
 
 Public site (5 languages) + performer portal + admin back office (English).
 
@@ -90,3 +90,20 @@ Sandbox jobs are never printed and are paid with a test card in the sandbox Prin
 | `DEPOSIT_PERCENT` | optional, default `50` |
 
 Test card: **4242 4242 4242 4242**, any future date, any CVC, any postal code. Payments show as TEST in the order timeline.
+
+## v1.10 — Full pages only
+- **Every photo prints full page** (full bleed, no white frame), in the PDF, the online proof and the sample books on the site.
+- Resolution flags are **warnings only**, they never change the layout: under 1400 px on the short side = "may print soft", under 1000 px = "too small" (ask for the original). Instagram exports (1440 x 1800, about 160 dpi) pass without a flag.
+- Flags are recalculated when an order is opened, so photos uploaded earlier follow the new rule.
+- FAQ updated in the 5 languages.
+
+## v1.11 — Book designs
+- **Book design** panel on each order (admin): 4 designs shown as mini previews with the customer's own cover photo — **Éditorial** (default), **Noir**, **Minimal**, **Couleur**. One click saves it; "Build a new proof with this design" applies it.
+- Photos stay full page in every design. A design changes the cover (name font, shade, back colour), the bio, credit and closing pages, and the colours. Couleur gives each shoot its own colour.
+- The customer's online proof shows the same design as the PDF.
+- New file: `lib/templates.js` (the 4 designs; add or adjust one there).
+
+## v1.12 — Cover and photo order made easy
+- Performer portal: a **"How to build your book"** guide at the top of Shoots & photos, a **"Your cover"** box showing the chosen cover, and a clear bar under every photo: **◀ ▶** (move), **★ Cover**, **✕** (remove). **↑ Move up / ↓ Move down** on each shoot. The order on screen is the order in the book.
+- Admin: the same **◀ ▶** on each photo and **↑ ↓** on each shoot; then "Build new proof".
+- The cover is chosen among the uploaded photos (no separate upload) and is not repeated inside the book.

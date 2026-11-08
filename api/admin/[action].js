@@ -5,24 +5,26 @@ import { q, one, ensureSchema, logEvent, hasDb } from '../../lib/db.js';
 import { readJson, fail, clip, isEmail, siteUrl, handle } from '../../lib/http.js';
 import { sign, requireAdmin } from '../../lib/auth.js';
 import { sendMail } from '../../lib/mail.js';
-import { PACKAGES, priceFor, STATUSES } from '../../lib/pricing.js';
+import { PACKAGES, priceFor, STATUSES, isLowRes, isTooSmall } from '../../lib/pricing.js';
 import { buildLayout } from '../../lib/layout.js';
 import { buildPdfs } from '../../lib/pdf.js';
 import { savePublic, removePublic, hasBlob } from '../../lib/storage.js';
 import * as lulu from '../../lib/lulu.js';
+import { TEMPLATES, templateKey } from '../../lib/templates.js';
 import { createOrder, balanceDue } from '../../lib/orders.js';
 import { hasStripe, stripeMode } from '../../lib/stripe.js';
 
 const token = () => crypto.randomBytes(24).toString('hex');
 const STATUS_KEYS = STATUSES.map(s => s[0]);
 const EDITABLE = ['status', 'customer_name', 'customer_email', 'phone', 'lang', 'package', 'copies', 'price_usd', 'shipping_usd', 'deposit_paid', 'balance_paid',
-  'ship_name', 'ship_address', 'ship_city', 'ship_region', 'ship_postal', 'ship_country', 'printer', 'printer_order_id', 'tracking', 'notes', 'ship_level'];
+  'ship_name', 'ship_address', 'ship_city', 'ship_region', 'ship_postal', 'ship_country', 'printer', 'printer_order_id', 'tracking', 'notes', 'ship_level', 'template'];
 
 async function loadOrder(id) {
   const order = await one('SELECT * FROM orders WHERE id=$1', [id]);
   if (!order) return null;
   const shoots = await q('SELECT * FROM shoots WHERE order_id=$1 ORDER BY position, id', [id]);
-  const photos = await q('SELECT * FROM photos WHERE order_id=$1 ORDER BY shoot_id, position, id', [id]);
+  const photos = (await q('SELECT * FROM photos WHERE order_id=$1 ORDER BY shoot_id, position, id', [id]))
+    .map(p => ({ ...p, low_res: isLowRes(p.width, p.height), too_small: isTooSmall(p.width, p.height) }));
   const proofs = await q('SELECT id, version, status, interior_url, cover_url, page_count, layout, sent_at, decided_at, created_at FROM proofs WHERE order_id=$1 ORDER BY version DESC', [id]);
   const comments = proofs.length ? await q('SELECT * FROM proof_comments WHERE proof_id = ANY($1::int[]) ORDER BY created_at', [proofs.map(p => p.id)]) : [];
   const events = await q('SELECT * FROM events WHERE order_id=$1 ORDER BY created_at DESC LIMIT 100', [id]);
@@ -60,7 +62,7 @@ export default async function handler(req, res) {
     const who = admin.name || admin.email;
 
     switch (action) {
-      case 'me': return res.json({ ok: true, admin, statuses: STATUSES, packages: PACKAGES, blob: hasBlob(), lulu: { configured: lulu.hasLulu(), env: lulu.luluEnv(), levels: lulu.SHIPPING_LEVELS }, stripe: { configured: hasStripe(), mode: stripeMode() } });
+      case 'me': return res.json({ ok: true, admin, statuses: STATUSES, packages: PACKAGES, blob: hasBlob(), lulu: { configured: lulu.hasLulu(), env: lulu.luluEnv(), levels: lulu.SHIPPING_LEVELS }, stripe: { configured: hasStripe(), mode: stripeMode() }, templates: TEMPLATES });
       case 'dashboard': {
         const counts = await q('SELECT status, count(*)::int AS n FROM orders GROUP BY status');
         const unread = (await one(`SELECT count(*)::int AS n FROM messages WHERE status='new'`)).n;
@@ -96,6 +98,7 @@ export default async function handler(req, res) {
           if (k === 'price_usd' || k === 'shipping_usd') v = v === '' || v == null ? null : Number(v);
           if (k === 'deposit_paid' || k === 'balance_paid') v = !!v;
           if (k === 'ship_level' && !lulu.SHIPPING_LEVELS.includes(v)) v = 'MAIL';
+          if (k === 'template') v = templateKey(v);
           if (typeof v === 'string') v = clip(v, 4000);
           vals.push(v); sets.push(`${k}=$${vals.length}`);
         }
@@ -104,6 +107,7 @@ export default async function handler(req, res) {
         vals.push(id);
         await q(`UPDATE orders SET ${sets.join(', ')}, updated_at=now() WHERE id=$${vals.length}`, vals);
         if (body.status && body.status !== cur.status) await logEvent(id, who, `Status: ${cur.status} → ${body.status}`);
+        else if (body.template && Object.keys(body).length <= 2) await logEvent(id, who, `Book design: ${TEMPLATES[templateKey(body.template)].label}`);
         else await logEvent(id, who, 'Order details updated');
         if (body.status === 'shipped' && cur.status !== 'shipped' && cur.customer_email) {
           const tr = body.tracking || cur.tracking;
@@ -176,6 +180,16 @@ export default async function handler(req, res) {
         if (!sets.length) return res.json({ ok: true });
         if (body.role === 'cover') { const p = await one('SELECT order_id FROM photos WHERE id=$1', [id]); await q(`UPDATE photos SET role=NULL WHERE order_id=$1 AND role='cover'`, [p.order_id]); }
         vals.push(id); await q(`UPDATE photos SET ${sets.join(', ')} WHERE id=$${vals.length}`, vals);
+        return res.json({ ok: true });
+      }
+      case 'photo-move': { // body: {order:[photo ids]} in their new order (one shoot)
+        const ids = (body.order || []).map(n => parseInt(n, 10));
+        for (let i = 0; i < ids.length; i++) await q('UPDATE photos SET position=$1 WHERE id=$2', [i + 1, ids[i]]);
+        return res.json({ ok: true });
+      }
+      case 'shoot-move': { // body: {order:[shoot ids]}
+        const ids = (body.order || []).map(n => parseInt(n, 10));
+        for (let i = 0; i < ids.length; i++) await q('UPDATE shoots SET position=$1 WHERE id=$2', [i + 1, ids[i]]);
         return res.json({ ok: true });
       }
       case 'layout-preview': {

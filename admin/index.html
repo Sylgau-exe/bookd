@@ -105,6 +105,17 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:.9rem;z-index:50}
 .muted{color:var(--muted)}.small{font-size:.82rem}.mono{font-family:var(--mono)}
 .msg-body{white-space:pre-wrap;max-width:520px}
+.designs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.design{border:2px solid var(--rule);border-radius:12px;padding:8px;background:none;cursor:pointer;text-align:left;font:inherit;color:inherit}
+.design.on{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft, rgba(176,18,59,.12))}
+.design .mini{display:grid;grid-template-columns:1fr 1fr;aspect-ratio:17/11;border-radius:6px;overflow:hidden;margin-bottom:8px;box-shadow:0 6px 16px -10px rgba(0,0,0,.5)}
+.design .mini .tp{padding:10% 9%;display:flex;flex-direction:column;gap:4px;container-type:inline-size}
+.design .mini .n{font-size:30cqw;line-height:.9}
+.design .mini .t{font-size:11cqw;line-height:1.1}
+.design .mini .l{height:2px;width:70%;opacity:.35;margin-top:2px}
+.design .mini .ph{background-size:cover;background-position:center;background-color:#ccc}
+.design b{display:block;font-size:.95rem}
+.design span{display:block;font-size:.78rem;color:var(--muted);margin-top:2px;line-height:1.35}
 </style>
 </head>
 <body>
@@ -257,13 +268,14 @@ async function viewOrder(id) {
         <div class="row" style="justify-content:space-between"><h2>Photos <span class="small muted">${kept} kept / ${d.photos.length} uploaded · package allows ${pkg.maxPhotos || '—'}</span></h2></div>
         ${d.shoots.length ? d.shoots.map(s => {
           const ph = d.photos.filter(p => p.shoot_id === s.id);
-          return `<div><div class="shoot-h"><h3>${esc(s.title || 'Untitled shoot')} <span class="small muted">· ${esc(s.kind || '')}</span></h3><span class="small muted">${ph.length} photo${ph.length === 1 ? '' : 's'}</span></div>
+          return `<div><div class="shoot-h"><h3>${esc(s.title || 'Untitled shoot')} <span class="small muted">· ${esc(s.kind || '')}</span></h3><span class="small muted">${ph.length} photo${ph.length === 1 ? '' : 's'} <button class="btn ghost small" data-sup="${s.id}" type="button" title="Move shoot earlier">↑</button><button class="btn ghost small" data-sdown="${s.id}" type="button" title="Move shoot later">↓</button></span></div>
             <div class="small muted" style="margin-bottom:8px">${(s.credits || []).filter(c => c.value).map(c => `<b>${esc(c.label)}:</b> ${esc(c.value)}`).join(' · ') || 'No credits yet'}${s.story ? `<br><i>“${esc(s.story)}”</i>` : ''}</div>
-            <div class="thumbs">${ph.map(p => `<div class="th ${p.keep === false ? 'off' : ''}"><a href="${esc(p.url)}" target="_blank" rel="noopener"><img src="${esc(p.url)}" alt="" loading="lazy"></a>
-              ${p.low_res ? '<span class="tag" title="' + p.width + '×' + p.height + ' px">LOW RES</span>' : ''}${p.role === 'cover' ? '<span class="tag cv">COVER</span>' : ''}
-              <div class="ops"><button data-keep="${p.id}" data-v="${p.keep === false ? 1 : 0}">${p.keep === false ? 'Restore' : 'Hide'}</button><button data-cover="${p.id}">Cover</button></div></div>`).join('') || '<span class="small muted">No photos.</span>'}</div></div>`;
+            <div class="thumbs">${ph.map((p, k) => `<div class="th ${p.keep === false ? 'off' : ''}"><a href="${esc(p.url)}" target="_blank" rel="noopener"><img src="${esc(p.url)}" alt="" loading="lazy"></a>
+              ${p.too_small ? '<span class="tag" title="' + p.width + '×' + p.height + ' px">TOO SMALL</span>' : p.low_res ? '<span class="tag" title="' + p.width + '×' + p.height + ' px">SOFT</span>' : ''}${p.role === 'cover' ? '<span class="tag cv">COVER</span>' : ''}
+              <div class="ops"><button data-left="${p.id}" data-shoot="${s.id}" title="Move earlier" ${k === 0 ? 'disabled' : ''}>◀</button><button data-keep="${p.id}" data-v="${p.keep === false ? 1 : 0}">${p.keep === false ? 'Restore' : 'Hide'}</button><button data-cover="${p.id}">${p.role === 'cover' ? '★' : '☆'} Cover</button><button data-right="${p.id}" data-shoot="${s.id}" title="Move later" ${k === ph.length - 1 ? 'disabled' : ''}>▶</button></div></div>`).join('') || '<span class="small muted">No photos.</span>'}</div></div>`;
         }).join('') : '<div class="empty">The performer hasn’t added shoots yet. Send them the portal link.</div>'}
       </section>
+      ${designCard(d)}
       <section class="card stack">
         <div class="row" style="justify-content:space-between"><h2>Proofs</h2><button class="btn primary" id="build" type="button" ${d.photos.length ? '' : 'disabled'}>Build new proof</button></div>
         <div id="build-out"></div>
@@ -313,6 +325,7 @@ async function viewOrder(id) {
   </div>`;
   const reload = () => viewOrder(id);
   bindLulu(id, reload, d);
+  bindDesigns(id, reload, d);
   $('#st').onchange = async e => {
     const s = e.target.value;
     if (s === 'shipped' && !confirmTracking(o)) { e.target.value = o.status; return; }
@@ -337,9 +350,45 @@ async function viewOrder(id) {
   v.onclick = async e => {
     const t = e.target;
     if (t.dataset.keep) { await post('photo-update', { id: +t.dataset.keep, keep: t.dataset.v === '1' }); reload(); }
+    else if (t.dataset.left || t.dataset.right) {
+      const sid = +t.dataset.shoot, pid = +(t.dataset.left || t.dataset.right), dir = t.dataset.left ? -1 : 1;
+      const ph = d.photos.filter(p => p.shoot_id === sid); const i = ph.findIndex(p => p.id === pid), j = i + dir;
+      if (j < 0 || j >= ph.length) return; [ph[i], ph[j]] = [ph[j], ph[i]];
+      await post('photo-move', { order: ph.map(p => p.id) }); toast('Order changed — build a new proof to see it'); reload();
+    }
+    else if (t.dataset.sup || t.dataset.sdown) {
+      const sid = +(t.dataset.sup || t.dataset.sdown), dir = t.dataset.sup ? -1 : 1; const ss = [...d.shoots]; const i = ss.findIndex(s => s.id === sid), j = i + dir;
+      if (j < 0 || j >= ss.length) return; [ss[i], ss[j]] = [ss[j], ss[i]];
+      await post('shoot-move', { order: ss.map(s => s.id) }); toast('Shoot moved — build a new proof to see it'); reload();
+    }
     else if (t.dataset.cover) { await post('photo-update', { id: +t.dataset.cover, role: 'cover' }); toast('Cover photo set'); reload(); }
     else if (t.dataset.send) { t.disabled = true; try { await post('send-proof', { proofId: +t.dataset.send }); toast('Proof sent to customer'); reload(); } catch (err) { toast(err.message); t.disabled = false; } }
     else if (t.dataset.res) { await post('comment-resolve', { id: +t.dataset.res, resolved: t.dataset.v === '1' }); reload(); }
+  };
+}
+function designCard(d) {
+  const T = META.templates || {}, o = d.order, cur = o.template || 'editorial';
+  const cover = d.photos.find(p => p.role === 'cover') || d.photos[0];
+  const img = cover ? `background-image:url('${esc(cover.url)}')` : '';
+  const mini = (k, t) => { const c = t.palette ? t.palette[0] : t.paper, ink = t.palette ? '#fff' : t.ink, ac = t.palette ? '#fff' : t.accent;
+    const ff = t.titles === 'serif' ? 'Georgia,serif' : 'system-ui,sans-serif', fw = t.titles === 'sans-bold' ? 700 : 400;
+    return `<div class="mini"><div class="tp" style="background:${c};color:${ink}"><div class="n" style="color:${ac};font-family:${t.num === 'italic' ? 'Georgia,serif' : 'system-ui,sans-serif'};font-style:${t.num === 'italic' ? 'italic' : 'normal'};font-weight:${t.num === 'bold' ? 700 : 400};${t.num === 'thin' ? 'font-size:12cqw' : ''}">01</div><div class="t" style="font-family:${ff};font-weight:${fw};${t.upper ? 'text-transform:uppercase' : ''}">${esc(o.profile?.name || o.customer_name || 'Name')}</div><div class="l" style="background:${ink}"></div><div class="l" style="background:${ink};width:50%"></div></div><div class="ph" style="${img}"></div></div>`; };
+  return `<section class="card stack" id="designs-card">
+    <div class="row" style="justify-content:space-between"><h2>Book design</h2><span class="small muted">Photos are always full page. The design changes the cover, colours and text pages.</span></div>
+    <div class="designs">${Object.entries(T).map(([k, t]) => `<button type="button" class="design ${k === cur ? 'on' : ''}" data-tpl="${k}">${mini(k, t)}<b>${esc(t.label)}${k === cur ? ' ✓' : ''}</b><span>${esc(t.desc)}</span></button>`).join('')}</div>
+    <div id="design-out"></div>
+  </section>`;
+}
+function bindDesigns(id, reload, d0) {
+  const box = $('#designs-card'); if (!box) return;
+  box.onclick = async e => {
+    const b = e.target.closest('[data-tpl]'); if (!b) return;
+    const k = b.dataset.tpl; if (k === (d0.order.template || 'editorial')) return;
+    try { await post('order-update', { id, template: k }); d0.order.template = k;
+      box.querySelectorAll('.design').forEach(x => { x.classList.toggle('on', x.dataset.tpl === k); x.querySelector('b').textContent = (META.templates[x.dataset.tpl].label) + (x.dataset.tpl === k ? ' ✓' : ''); });
+      $('#design-out').innerHTML = d0.photos.length ? `<div class="row"><span class="small">Design “${esc(META.templates[k].label)}” saved.</span><button class="btn primary" type="button" id="design-build">Build a new proof with this design</button></div>` : `<div class="small">Design “${esc(META.templates[k].label)}” saved.</div>`;
+      const bb = $('#design-build'); if (bb) bb.onclick = () => $('#build').click();
+    } catch (err) { toast(err.message); }
   };
 }
 function luluCard(d) {
