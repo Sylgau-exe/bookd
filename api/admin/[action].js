@@ -124,6 +124,7 @@ export default async function handler(req, res) {
       case 'order-delete': {
         const oid = parseInt(body.id, 10);
         const files = [...(await q('SELECT url FROM photos WHERE order_id=$1', [oid])).map(r => r.url),
+          ...(await q('SELECT credit_image FROM shoots WHERE order_id=$1', [oid])).map(r => r.credit_image),
           ...(await q('SELECT interior_url, cover_url FROM proofs WHERE order_id=$1', [oid])).flatMap(r => [r.interior_url, r.cover_url])].filter(Boolean);
         await q('DELETE FROM orders WHERE id=$1', [oid]);
         for (const f of files) await removePublic(f);

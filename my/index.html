@@ -101,6 +101,12 @@ textarea{min-height:90px;resize:vertical}
 .pg.blank{background:repeating-linear-gradient(45deg,#E9E4DA 0 10px,#E2DCD0 10px 20px)}
 .pg.closing .in{align-items:center;justify-content:center;text-align:center;gap:3cqw}
 .cover-prev{max-width:260px}
+.pg .cimg{margin-top:3cqw;display:block}
+.pg .cimg.portrait{width:11.2cqw;height:11.2cqw;border-radius:50%;object-fit:cover}
+.pg .cimg.logo{max-width:18.8cqw;max-height:9.4cqw;object-fit:contain}
+.credimg{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.credimg img{width:56px;height:56px;object-fit:contain;border-radius:8px;background:var(--bg)}
+.credimg img.portrait{border-radius:50%;object-fit:cover}
 .pg .orn{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
 .pg .in{z-index:1}
 /* book designs (templates) */
@@ -246,6 +252,9 @@ function shootCard(s) {
     <label>Title (e.g. “Rose Bonbon” or the show’s name)<input name="title" value="${esc(s.title)}" ${dis()}></label></div>
     <div><div class="small muted" style="margin-bottom:6px">Credits</div><div class="credits">${credits.map(c => `<div class="cr"><input data-cl value="${esc(c.label)}" placeholder="Role" ${dis()}><input data-cv value="${esc(c.value)}" placeholder="Name / detail" ${dis()}><button class="btn ghost" data-rmcr type="button" ${dis()}>✕</button></div>`).join('')}</div>
     <button class="btn ghost small" data-addcr type="button" ${dis()}>+ Add a credit</button></div>
+    <div><div class="small muted" style="margin-bottom:6px">Photographer’s photo or company logo (optional, shown small on the credit page)</div>
+      <div class="credimg">${s.credit_image ? `<img class="${s.credit_image_kind === 'logo' ? 'logo' : 'portrait'}" src="${esc(s.credit_image)}" alt=""><button class="btn ghost small" data-cimgdel type="button" ${dis()}>Remove</button>` : ''}
+      ${D.order.locked ? '' : `<label class="btn small">${s.credit_image ? 'Replace with a photo' : 'Add a photo of the photographer'}<input type="file" accept="image/jpeg,image/png" data-cimg="portrait" hidden></label><label class="btn small">${s.credit_image ? 'Replace with a logo' : 'Add a logo'}<input type="file" accept="image/jpeg,image/png" data-cimg="logo" hidden></label>`}</div></div>
     <label>The story — fun, difficult, demanding? A few words about that day<textarea name="story" maxlength="800" ${dis()}>${esc(s.story)}</textarea></label>
     <div class="thumbs">${ph.map((p, k) => `<div class="th${p.role === 'cover' ? ' is-cover' : ''}"><img src="${esc(p.url)}" alt="" loading="lazy">${p.too_small ? '<span class="tag">TOO SMALL</span>' : ''}${p.role === 'cover' ? '<span class="tag cv">COVER</span>' : ''}
       ${D.order.locked ? '' : `<div class="ops"><button data-left="${p.id}" type="button" title="Move earlier" ${k === 0 ? 'disabled' : ''}>◀</button><button data-cover="${p.id}" type="button" class="cvb">${p.role === 'cover' ? '★ Cover' : '☆ Cover'}</button><button data-right="${p.id}" type="button" title="Move later" ${k === ph.length - 1 ? 'disabled' : ''}>▶</button><button data-del="${p.id}" type="button" title="Remove">✕</button></div>`}</div>`).join('')}<div class="up-slot"></div></div>
@@ -268,6 +277,13 @@ function shootCard(s) {
     else if (t.dataset.del) { await api('photo-delete', { id: +t.dataset.del }); D.photos = D.photos.filter(p => p.id !== +t.dataset.del); render(); }
     else if (t.dataset.cover) { await api('photo-cover', { id: +t.dataset.cover }); D.photos.forEach(p => p.role = p.id === +t.dataset.cover ? 'cover' : null); toast('Cover photo chosen'); render(); }
   };
+  el.querySelectorAll('input[data-cimg]').forEach(inp => inp.onchange = async () => {
+    const f = inp.files[0]; if (!f) return;
+    if (f.size > 4 * 1024 * 1024) { toast('Please use a file under 4 MB'); return; }
+    try { const r = await api('shoot-image', null, { query: `&shoot=${s.id}&kind=${inp.dataset.cimg}`, headers: { 'Content-Type': f.type }, raw: f });
+      s.credit_image = r.url; s.credit_image_kind = r.kind; toast(r.kind === 'logo' ? 'Logo added' : 'Photo added'); render(); } catch (e) { toast(e.message); }
+  });
+  const cdel = $('[data-cimgdel]', el); if (cdel) cdel.onclick = async () => { await api('shoot-image-delete', { id: s.id }); s.credit_image = null; s.credit_image_kind = null; render(); };
   const drop = $('.drop', el);
   if (drop) {
     const input = $('input[type=file]', drop);
@@ -329,7 +345,7 @@ function pageHtml(p, idx) {
   const sel = selPage === n ? ' sel' : '';
   if (p.type === 'photo' && p.mode === 'duo') return `<div class="pg${sel}" data-page="${n}"><div class="duo">${p.items.map(it => `<img src="${esc(it.url)}" alt="">`).join('')}</div>${p.tooSmall ? '<span class="lr">TOO SMALL</span>' : ''}${badge}${fol}</div>`;
   if (p.type === 'photo') return `<div class="pg${sel}" data-page="${n}"><img class="${p.mode}" src="${esc(p.url)}" alt="">${p.tooSmall ? '<span class="lr">TOO SMALL</span>' : ''}${badge}${fol}</div>`;
-  if (p.type === 'credit') return `<div class="pg${sel}" data-page="${n}"${creditStyle(D.proof?.layout?.theme, p.num)}>${ornSvg('credit', p.num)}<div class="in"><div class="num">${String(p.num).padStart(2, '0')}</div><div class="kind">${esc(p.kind)}</div><div class="ttl">${esc(p.title)}</div><dl>${p.credits.map(c => `<dt>${esc(c.label)}</dt><dd>${esc(c.value)}</dd>`).join('')}</dl>${p.story ? `<div class="story">${esc(p.story)}</div>` : ''}</div>${badge}${fol}</div>`;
+  if (p.type === 'credit') return `<div class="pg${sel}" data-page="${n}"${creditStyle(D.proof?.layout?.theme, p.num)}>${ornSvg('credit', p.num)}<div class="in"><div class="num">${String(p.num).padStart(2, '0')}</div><div class="kind">${esc(p.kind)}</div><div class="ttl">${esc(p.title)}</div><dl>${p.credits.map(c => `<dt>${esc(c.label)}</dt><dd>${esc(c.value)}</dd>`).join('')}</dl>${p.creditImage ? `<img class="cimg ${p.creditImage.kind}" src="${esc(p.creditImage.url)}" alt="">` : ''}${p.story ? `<div class="story">${esc(p.story)}</div>` : ''}</div>${badge}${fol}</div>`;
   if (p.type === 'bio') return `<div class="pg${sel}" data-page="${n}">${ornSvg('bio')}<div class="in"><div class="ttl" style="font-size:8cqw">${esc(p.name)}</div><div class="kind">${esc(p.role)}</div><div class="bio">${esc(p.bio)}</div><dl style="margin-top:auto">${p.facts.map(f => `<dt>${esc(f[0])}</dt><dd>${esc(f[1])}</dd>`).join('')}</dl></div>${badge}${fol}</div>`;
   if (p.type === 'closing') return `<div class="pg closing${sel}" data-page="${n}">${ornSvg('closing')}<div class="in"><div class="ttl">${esc(p.name)}</div><div class="kind">${esc(p.contact)}</div><div class="kind">${esc(p.website)}</div></div>${badge}</div>`;
   return `<div class="pg blank" data-page="${n}"></div>`;

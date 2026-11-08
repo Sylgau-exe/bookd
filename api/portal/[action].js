@@ -34,7 +34,7 @@ export default async function handler(req, res) {
     }
 
     if (action === 'get') {
-      const shoots = await q('SELECT id, position, kind, title, credits, story FROM shoots WHERE order_id=$1 ORDER BY position, id', [order.id]);
+      const shoots = await q('SELECT id, position, kind, title, credits, story, credit_image, credit_image_kind FROM shoots WHERE order_id=$1 ORDER BY position, id', [order.id]);
       const photos = (await q('SELECT id, shoot_id, position, url, width, height, low_res, keep, role FROM photos WHERE order_id=$1 ORDER BY shoot_id, position, id', [order.id]))
         .map(p => ({ ...p, low_res: isLowRes(p.width, p.height), too_small: isTooSmall(p.width, p.height) }));
       const proof = await one(`SELECT id, version, status, layout, interior_url, page_count, sent_at FROM proofs WHERE order_id=$1 AND status IN ('sent','approved','changes') ORDER BY version DESC LIMIT 1`, [order.id]);
@@ -47,7 +47,7 @@ export default async function handler(req, res) {
             paid: +(order.paid_usd || order.deposit_usd || 0), deposit_paid: !!order.deposit_paid, balance_paid: !!order.balance_paid, due: balanceDue(order) } },
         shoots, photos, proof, comments });
     }
-    const body = req.method === 'POST' && action !== 'upload' ? await readJson(req) : {};
+    const body = req.method === 'POST' && !['upload', 'shoot-image'].includes(action) ? await readJson(req) : {};
     if (locked && !['proof-comment'].includes(action)) return fail(res, 403, 'This book is approved and locked. Write to us if you need a change.');
 
     switch (action) {
@@ -73,11 +73,29 @@ export default async function handler(req, res) {
         const s = await one('INSERT INTO shoots (order_id, position, kind, title, credits, story) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id', [order.id, pos, kind, clip(body.title, 120), JSON.stringify(credits), clip(body.story, 800)]);
         return res.json({ ok: true, id: s.id });
       }
+      case 'shoot-image': { // optional photographer portrait or company logo for the credit page (small file through the function)
+        const s = await ownShoot(req.query.shoot); if (!s) return fail(res, 404, 'Shoot not found');
+        const type = req.headers['content-type'] || '';
+        if (!/^image\/(jpeg|png)$/.test(type)) return fail(res, 400, 'Please use a JPG or PNG file');
+        const buf = await readRaw(req);
+        const kind = req.query.kind === 'logo' ? 'logo' : 'portrait';
+        const url = await savePublic(`orders/${order.ref}/credit-s${s.id}-${Date.now()}.${type === 'image/png' ? 'png' : 'jpg'}`, buf, type);
+        if (s.credit_image) await removePublic(s.credit_image);
+        await q('UPDATE shoots SET credit_image=$1, credit_image_kind=$2 WHERE id=$3', [url, kind, s.id]);
+        return res.json({ ok: true, url, kind });
+      }
+      case 'shoot-image-delete': {
+        const s = await ownShoot(body.id); if (!s) return fail(res, 404, 'Shoot not found');
+        if (s.credit_image) await removePublic(s.credit_image);
+        await q('UPDATE shoots SET credit_image=NULL, credit_image_kind=NULL WHERE id=$1', [s.id]);
+        return res.json({ ok: true });
+      }
       case 'shoot-delete': {
         const s = await ownShoot(body.id); if (!s) return fail(res, 404, 'Shoot not found');
         const ph = await q('SELECT url FROM photos WHERE shoot_id=$1', [s.id]);
         await q('DELETE FROM shoots WHERE id=$1', [s.id]);
         for (const p of ph) await removePublic(p.url);
+        if (s.credit_image) await removePublic(s.credit_image);
         return res.json({ ok: true });
       }
       case 'shoot-move': {

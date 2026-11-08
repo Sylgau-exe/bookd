@@ -1,4 +1,4 @@
-# BOOKD — v1.15
+# BOOKD — v1.16
 
 Public site (5 languages) + performer portal + admin back office (English).
 
@@ -119,3 +119,7 @@ Test card: **4242 4242 4242 4242**, any future date, any CVC, any postal code. P
 ## v1.15 — Page layout: Full page, Mix, Gallery
 - In the **Book design** panel (admin), a **Page layout** choice per order: **Full page** (every photo fills the page, default), **Mix** (like the demo book: full pages, pages of two photos side by side, and framed photos), **Gallery** (every photo framed with a white border).
 - In Mix, each shoot opens with a full-page photo after its credit page. The PDF and the online proof match.
+
+## v1.16 — Photographer photo or logo on the credit page
+- Each shoot can have an optional **photo of the photographer** (shown round) or a **company logo** (shown as is, PNG with transparency works), uploaded under the credits in the performer portal ("Add a photo of the photographer" / "Add a logo", Replace, Remove). JPG or PNG under 4 MB.
+- It prints small under the credits on that shoot's credit page, and shows the same in the online proof.

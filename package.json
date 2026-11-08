@@ -1,6 +1,6 @@
 {
   "name": "bookd",
-  "version": "1.15.0",
+  "version": "1.16.0",
   "private": true,
   "description": "BOOKD \u2014 printed portfolio books for performers: public site, performer portal and admin back office.",
   "type": "module",
