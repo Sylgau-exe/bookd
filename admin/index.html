@@ -105,6 +105,9 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:.9rem;z-index:50}
 .muted{color:var(--muted)}.small{font-size:.82rem}.mono{font-family:var(--mono)}
 .msg-body{white-space:pre-wrap;max-width:520px}
+.swatches{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sw{width:30px;height:30px;border-radius:50%;border:2px solid var(--rule);cursor:pointer;padding:0}
+.sw.on{outline:3px solid var(--accent);outline-offset:2px}
 .designs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
 .design{border:2px solid var(--rule);border-radius:12px;padding:8px;background:none;cursor:pointer;text-align:left;font:inherit;color:inherit}
 .design.on{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft, rgba(176,18,59,.12))}
@@ -271,11 +274,12 @@ async function viewOrder(id) {
           return `<div><div class="shoot-h"><h3>${esc(s.title || 'Untitled shoot')} <span class="small muted">· ${esc(s.kind || '')}</span></h3><span class="small muted">${ph.length} photo${ph.length === 1 ? '' : 's'} <button class="btn ghost small" data-sup="${s.id}" type="button" title="Move shoot earlier">↑</button><button class="btn ghost small" data-sdown="${s.id}" type="button" title="Move shoot later">↓</button></span></div>
             <div class="small muted" style="margin-bottom:8px">${(s.credits || []).filter(c => c.value).map(c => `<b>${esc(c.label)}:</b> ${esc(c.value)}`).join(' · ') || 'No credits yet'}${s.story ? `<br><i>“${esc(s.story)}”</i>` : ''}</div>
             <div class="thumbs">${ph.map((p, k) => `<div class="th ${p.keep === false ? 'off' : ''}"><a href="${esc(p.url)}" target="_blank" rel="noopener"><img src="${esc(p.url)}" alt="" loading="lazy"></a>
-              ${p.too_small ? '<span class="tag" title="' + p.width + '×' + p.height + ' px">TOO SMALL</span>' : p.low_res ? '<span class="tag" title="' + p.width + '×' + p.height + ' px">SOFT</span>' : ''}${p.role === 'cover' ? '<span class="tag cv">COVER</span>' : ''}
+              ${p.too_small ? '<span class="tag" title="' + p.width + '×' + p.height + ' px">TOO SMALL</span>' : ''}${p.role === 'cover' ? '<span class="tag cv">COVER</span>' : ''}
               <div class="ops"><button data-left="${p.id}" data-shoot="${s.id}" title="Move earlier" ${k === 0 ? 'disabled' : ''}>◀</button><button data-keep="${p.id}" data-v="${p.keep === false ? 1 : 0}">${p.keep === false ? 'Restore' : 'Hide'}</button><button data-cover="${p.id}">${p.role === 'cover' ? '★' : '☆'} Cover</button><button data-right="${p.id}" data-shoot="${s.id}" title="Move later" ${k === ph.length - 1 ? 'disabled' : ''}>▶</button></div></div>`).join('') || '<span class="small muted">No photos.</span>'}</div></div>`;
         }).join('') : '<div class="empty">The performer hasn’t added shoots yet. Send them the portal link.</div>'}
       </section>
       ${designCard(d)}
+      ${decoCard(d)}
       <section class="card stack">
         <div class="row" style="justify-content:space-between"><h2>Proofs</h2><button class="btn primary" id="build" type="button" ${d.photos.length ? '' : 'disabled'}>Build new proof</button></div>
         <div id="build-out"></div>
@@ -326,6 +330,7 @@ async function viewOrder(id) {
   const reload = () => viewOrder(id);
   bindLulu(id, reload, d);
   bindDesigns(id, reload, d);
+  bindDeco(id, reload, d);
   $('#st').onchange = async e => {
     const s = e.target.value;
     if (s === 'shipped' && !confirmTracking(o)) { e.target.value = o.status; return; }
@@ -376,18 +381,55 @@ function designCard(d) {
   return `<section class="card stack" id="designs-card">
     <div class="row" style="justify-content:space-between"><h2>Book design</h2><span class="small muted">Photos are always full page. The design changes the cover, colours and text pages.</span></div>
     <div class="designs">${Object.entries(T).map(([k, t]) => `<button type="button" class="design ${k === cur ? 'on' : ''}" data-tpl="${k}">${mini(k, t)}<b>${esc(t.label)}${k === cur ? ' ✓' : ''}</b><span>${esc(t.desc)}</span></button>`).join('')}</div>
+    <div class="row" style="gap:8px;align-items:center"><span class="small" style="margin-right:4px"><b>Page layout</b></span>${[['full', 'Full page', 'Every photo fills the page'], ['mix', 'Mix', 'Full pages, pairs and framed photos, like the demo book'], ['gallery', 'Gallery', 'Every photo with a white border']].map(([k, l, t]) => `<button type="button" class="btn ${k === (o.photo_style || 'full') ? 'primary' : ''}" data-pstyle="${k}" title="${t}">${l}</button>`).join('')}</div>
+    <div class="small muted" id="pstyle-help">${{ full: 'Every photo fills the page.', mix: 'Full pages, pages of two photos and framed photos, like the demo book.', gallery: 'Every photo framed with a white border.' }[o.photo_style || 'full']}</div>
     <div id="design-out"></div>
   </section>`;
+}
+function decoMini(o, d, key) {
+  const t = (META.templates || {})[d.order.template || 'editorial'] || {}; const col = d.order.ornament_color || 'accent';
+  const c = col === 'accent' ? (t.accent || '#B0123B') : col; const bg = t.paper || '#fff', ink = t.ink || '#111';
+  const shapes = (o.shapes || []).map(s => s.fill ? `<path d="${s.d}" fill="${c}" fill-opacity="${s.op ?? 1}"/>` : `<path d="${s.d}" fill="none" stroke="${c}" stroke-width="${(s.w || 1.5) * 2}"/>`).join('');
+  return `<svg viewBox="0 0 850 1100" style="width:100%;aspect-ratio:8.5/11;display:block;border-radius:6px;background:${bg};box-shadow:0 6px 16px -10px rgba(0,0,0,.5);margin-bottom:8px">${shapes}<text x="75" y="260" font-size="150" font-family="Georgia,serif" font-style="italic" fill="${t.accent || '#B0123B'}">01</text><rect x="75" y="320" width="380" height="34" fill="${ink}"/><rect x="75" y="420" width="560" height="14" fill="${ink}" opacity=".35"/><rect x="75" y="460" width="480" height="14" fill="${ink}" opacity=".35"/><rect x="75" y="500" width="520" height="14" fill="${ink}" opacity=".35"/></svg>`;
+}
+function decoCard(d) {
+  const O = META.ornaments || {}, C = META.ornamentColors || {}, cur = d.order.ornament || 'none', col = d.order.ornament_color || 'accent';
+  const t = (META.templates || {})[d.order.template || 'editorial'] || {};
+  return `<section class="card stack" id="deco-card">
+    <div class="row" style="justify-content:space-between"><h2>Decoration</h2><span class="small muted">Vector graphics on the text pages (bio, credits, last page). Photos stay clean.</span></div>
+    <div class="designs">${Object.entries(O).map(([k, o]) => `<button type="button" class="design ${k === cur ? 'on' : ''}" data-orn="${k}">${decoMini(o, d, k)}<b>${esc(o.label)}${k === cur ? ' ✓' : ''}</b><span>${esc(o.desc)}</span></button>`).join('')}</div>
+    <div class="swatches"><span class="small" style="margin-right:4px">Colour</span>${Object.entries(C).map(([k, l]) => `<button type="button" class="sw ${k === col ? 'on' : ''}" data-ocol="${k}" title="${esc(l)}" style="background:${k === 'accent' ? (t.accent || '#B0123B') : k}"></button>`).join('')}<span class="small muted" id="deco-col-name">${esc(C[col] || '')}</span></div>
+    <div id="deco-out"></div>
+  </section>`;
+}
+function bindDeco(id, reload, d0) {
+  const box = $('#deco-card'); if (!box) return;
+  box.onclick = async e => {
+    const b = e.target.closest('[data-orn],[data-ocol]'); if (!b) return;
+    const body = { id }; if (b.dataset.orn) body.ornament = b.dataset.orn; else body.ornament_color = b.dataset.ocol;
+    try { await post('order-update', body); Object.assign(d0.order, body.ornament ? { ornament: body.ornament } : { ornament_color: body.ornament_color });
+      const keep = window.scrollY; box.outerHTML = decoCard(d0); bindDeco(id, reload, d0); window.scrollTo(0, keep);
+      $('#deco-out').innerHTML = d0.photos.length ? `<div class="row"><span class="small">Decoration saved.</span><button class="btn primary" type="button" id="deco-build">Build a new proof with this decoration</button></div>` : '<div class="small">Decoration saved.</div>';
+      const bb = $('#deco-build'); if (bb) bb.onclick = () => $('#build').click();
+    } catch (err) { toast(err.message); }
+  };
 }
 function bindDesigns(id, reload, d0) {
   const box = $('#designs-card'); if (!box) return;
   box.onclick = async e => {
+    const ps = e.target.closest('[data-pstyle]');
+    if (ps) { try { await post('order-update', { id, photo_style: ps.dataset.pstyle }); d0.order.photo_style = ps.dataset.pstyle;
+      box.querySelectorAll('[data-pstyle]').forEach(x => x.classList.toggle('primary', x === ps));
+      $('#pstyle-help').textContent = { full: 'Every photo fills the page.', mix: 'Full pages, pages of two photos and framed photos, like the demo book.', gallery: 'Every photo framed with a white border.' }[ps.dataset.pstyle];
+      $('#design-out').innerHTML = d0.photos.length ? `<div class="row"><span class="small">Page layout saved.</span><button class="btn primary" type="button" id="design-build">Build a new proof with this layout</button></div>` : '';
+      const bb = $('#design-build'); if (bb) bb.onclick = () => $('#build').click(); } catch (err) { toast(err.message); } return; }
     const b = e.target.closest('[data-tpl]'); if (!b) return;
     const k = b.dataset.tpl; if (k === (d0.order.template || 'editorial')) return;
     try { await post('order-update', { id, template: k }); d0.order.template = k;
       box.querySelectorAll('.design').forEach(x => { x.classList.toggle('on', x.dataset.tpl === k); x.querySelector('b').textContent = (META.templates[x.dataset.tpl].label) + (x.dataset.tpl === k ? ' ✓' : ''); });
       $('#design-out').innerHTML = d0.photos.length ? `<div class="row"><span class="small">Design “${esc(META.templates[k].label)}” saved.</span><button class="btn primary" type="button" id="design-build">Build a new proof with this design</button></div>` : `<div class="small">Design “${esc(META.templates[k].label)}” saved.</div>`;
       const bb = $('#design-build'); if (bb) bb.onclick = () => $('#build').click();
+      const dc = $('#deco-card'); if (dc) { dc.outerHTML = decoCard(d0); bindDeco(id, reload, d0); }
     } catch (err) { toast(err.message); }
   };
 }

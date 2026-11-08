@@ -11,13 +11,14 @@ import { buildPdfs } from '../../lib/pdf.js';
 import { savePublic, removePublic, hasBlob } from '../../lib/storage.js';
 import * as lulu from '../../lib/lulu.js';
 import { TEMPLATES, templateKey } from '../../lib/templates.js';
+import { ORNAMENTS, ORNAMENT_COLORS, ornamentKey, ornamentColor } from '../../lib/ornaments.js';
 import { createOrder, balanceDue } from '../../lib/orders.js';
 import { hasStripe, stripeMode } from '../../lib/stripe.js';
 
 const token = () => crypto.randomBytes(24).toString('hex');
 const STATUS_KEYS = STATUSES.map(s => s[0]);
 const EDITABLE = ['status', 'customer_name', 'customer_email', 'phone', 'lang', 'package', 'copies', 'price_usd', 'shipping_usd', 'deposit_paid', 'balance_paid',
-  'ship_name', 'ship_address', 'ship_city', 'ship_region', 'ship_postal', 'ship_country', 'printer', 'printer_order_id', 'tracking', 'notes', 'ship_level', 'template'];
+  'ship_name', 'ship_address', 'ship_city', 'ship_region', 'ship_postal', 'ship_country', 'printer', 'printer_order_id', 'tracking', 'notes', 'ship_level', 'template', 'ornament', 'ornament_color', 'photo_style'];
 
 async function loadOrder(id) {
   const order = await one('SELECT * FROM orders WHERE id=$1', [id]);
@@ -62,7 +63,7 @@ export default async function handler(req, res) {
     const who = admin.name || admin.email;
 
     switch (action) {
-      case 'me': return res.json({ ok: true, admin, statuses: STATUSES, packages: PACKAGES, blob: hasBlob(), lulu: { configured: lulu.hasLulu(), env: lulu.luluEnv(), levels: lulu.SHIPPING_LEVELS }, stripe: { configured: hasStripe(), mode: stripeMode() }, templates: TEMPLATES });
+      case 'me': return res.json({ ok: true, admin, statuses: STATUSES, packages: PACKAGES, blob: hasBlob(), lulu: { configured: lulu.hasLulu(), env: lulu.luluEnv(), levels: lulu.SHIPPING_LEVELS }, stripe: { configured: hasStripe(), mode: stripeMode() }, templates: TEMPLATES, ornaments: ORNAMENTS, ornamentColors: ORNAMENT_COLORS });
       case 'dashboard': {
         const counts = await q('SELECT status, count(*)::int AS n FROM orders GROUP BY status');
         const unread = (await one(`SELECT count(*)::int AS n FROM messages WHERE status='new'`)).n;
@@ -99,6 +100,9 @@ export default async function handler(req, res) {
           if (k === 'deposit_paid' || k === 'balance_paid') v = !!v;
           if (k === 'ship_level' && !lulu.SHIPPING_LEVELS.includes(v)) v = 'MAIL';
           if (k === 'template') v = templateKey(v);
+          if (k === 'ornament') v = ornamentKey(v);
+          if (k === 'ornament_color') v = ornamentColor(v);
+          if (k === 'photo_style') v = ['full', 'mix', 'gallery'].includes(v) ? v : 'full';
           if (typeof v === 'string') v = clip(v, 4000);
           vals.push(v); sets.push(`${k}=$${vals.length}`);
         }

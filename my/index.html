@@ -84,6 +84,8 @@ textarea{min-height:90px;resize:vertical}
 .pg .in{position:absolute;inset:8cqw;display:flex;flex-direction:column}
 .pg img.full{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .pg img.framed{position:absolute;inset:10cqw 10cqw 14cqw;width:80cqw;height:calc(100% - 24cqw);object-fit:contain}
+.pg .duo{position:absolute;left:8.8cqw;right:8.8cqw;top:50%;transform:translateY(-50%);display:grid;grid-template-columns:1fr 1fr;gap:2.9cqw}
+.pg .duo img{width:100%;aspect-ratio:4/5;object-fit:cover;display:block}
 .pg .fol{position:absolute;bottom:3cqw;font-family:var(--mono);font-size:2.4cqw;color:var(--page-muted)}
 .pg .fol.l{left:5cqw}.pg .fol.r{right:5cqw}
 .pg .lr{position:absolute;top:3cqw;left:3cqw;font-family:var(--mono);font-size:2.4cqw;background:var(--warn);color:#fff;padding:.5cqw 1.5cqw;border-radius:1cqw}
@@ -99,6 +101,8 @@ textarea{min-height:90px;resize:vertical}
 .pg.blank{background:repeating-linear-gradient(45deg,#E9E4DA 0 10px,#E2DCD0 10px 20px)}
 .pg.closing .in{align-items:center;justify-content:center;text-align:center;gap:3cqw}
 .cover-prev{max-width:260px}
+.pg .orn{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.pg .in{z-index:1}
 /* book designs (templates) */
 .tpl-sans .pg .ttl,.tpl-sans .pg .num,.tpl-sans .pg .story{font-family:var(--sans,system-ui,sans-serif)}
 .tpl-sans .pg .num,.tpl-sans .pg .ttl{font-style:normal;font-weight:700}
@@ -209,7 +213,7 @@ function paneShoots() {
   const kept = D.photos.length;
   $('#pane').innerHTML = `<div class="card">
     <div class="row" style="justify-content:space-between"><h2>Shoots & photos</h2><span class="small muted">${kept} / ${D.order.maxPhotos} photos</span></div>
-    <div class="note">Every photo prints full page. Original files or Instagram downloads (1440 px wide) print well. Smaller photos get a <b>MAY PRINT SOFT</b> or <b>TOO SMALL</b> badge: ask the photographer for the original, or keep them anyway; you decide at the proof.</div>
+    <div class="note">Every photo prints full page. Original files and Instagram downloads print well. Only a photo too small to print well gets a <b>TOO SMALL</b> badge: ask the photographer for the original, or keep it anyway; you decide at the proof.</div>
     <div class="guide"><b>How to build your book</b><ol>
       <li><b>One section per shoot</b> (or show, or event): press “+ Add a shoot”, fill in the credits and a few words about that day.</li>
       <li><b>Upload all the photos of that shoot at once</b>: select several files together. Use the original files (JPG or PNG), not screenshots.</li>
@@ -243,7 +247,7 @@ function shootCard(s) {
     <div><div class="small muted" style="margin-bottom:6px">Credits</div><div class="credits">${credits.map(c => `<div class="cr"><input data-cl value="${esc(c.label)}" placeholder="Role" ${dis()}><input data-cv value="${esc(c.value)}" placeholder="Name / detail" ${dis()}><button class="btn ghost" data-rmcr type="button" ${dis()}>✕</button></div>`).join('')}</div>
     <button class="btn ghost small" data-addcr type="button" ${dis()}>+ Add a credit</button></div>
     <label>The story — fun, difficult, demanding? A few words about that day<textarea name="story" maxlength="800" ${dis()}>${esc(s.story)}</textarea></label>
-    <div class="thumbs">${ph.map((p, k) => `<div class="th${p.role === 'cover' ? ' is-cover' : ''}"><img src="${esc(p.url)}" alt="" loading="lazy">${p.too_small ? '<span class="tag">TOO SMALL</span>' : p.low_res ? '<span class="tag">MAY PRINT SOFT</span>' : ''}${p.role === 'cover' ? '<span class="tag cv">COVER</span>' : ''}
+    <div class="thumbs">${ph.map((p, k) => `<div class="th${p.role === 'cover' ? ' is-cover' : ''}"><img src="${esc(p.url)}" alt="" loading="lazy">${p.too_small ? '<span class="tag">TOO SMALL</span>' : ''}${p.role === 'cover' ? '<span class="tag cv">COVER</span>' : ''}
       ${D.order.locked ? '' : `<div class="ops"><button data-left="${p.id}" type="button" title="Move earlier" ${k === 0 ? 'disabled' : ''}>◀</button><button data-cover="${p.id}" type="button" class="cvb">${p.role === 'cover' ? '★ Cover' : '☆ Cover'}</button><button data-right="${p.id}" type="button" title="Move later" ${k === ph.length - 1 ? 'disabled' : ''}>▶</button><button data-del="${p.id}" type="button" title="Remove">✕</button></div>`}</div>`).join('')}<div class="up-slot"></div></div>
     ${D.order.locked ? '' : `<label class="drop" tabindex="0"><input type="file" accept="image/jpeg,image/png" multiple hidden><span>Add photos — tap to choose, or drop them here</span></label>`}
     <div class="row" style="justify-content:space-between"><button class="btn" data-save type="button" ${dis()}>Save this shoot</button><span class="shoot-order"><button class="btn ghost small" data-sup type="button" ${dis()} title="Move this shoot earlier">↑ Move up</button><button class="btn ghost small" data-sdown type="button" ${dis()} title="Move this shoot later">↓ Move down</button></span><button class="btn ghost" data-delshoot type="button" ${dis()}>Delete shoot</button></div>`;
@@ -302,7 +306,7 @@ async function uploadFiles(shoot, files, el) {
         photo = (await api('upload', null, { query: `&shoot=${shoot.id}`, raw: f, headers: { 'Content-Type': f.type, 'X-Width': String(w), 'X-Height': String(h), 'X-Filename': encodeURIComponent(f.name) } })).photo;
       }
       D.photos.push(photo);
-      tile.innerHTML = `<img src="${esc(photo.url)}" alt="">${photo.too_small ? '<span class="tag">TOO SMALL</span>' : photo.low_res ? '<span class="tag">MAY PRINT SOFT</span>' : ''}`; tile.className = 'th';
+      tile.innerHTML = `<img src="${esc(photo.url)}" alt="">${photo.too_small ? '<span class="tag">TOO SMALL</span>' : ''}`; tile.className = 'th';
     } catch (e) { tile.textContent = '⚠ ' + e.message; }
   }
   setTimeout(render, 400);
@@ -312,14 +316,22 @@ async function uploadFiles(shoot, files, el) {
 function tplClass(t) { if (!t) return ''; return [t.titles !== 'serif' ? 'tpl-sans' : '', t.upper ? 'tpl-upper' : '', t.num === 'thin' ? 'tpl-thin' : ''].join(' '); }
 function tplVars(t) { return t ? `--page:${t.paper};--page-ink:${t.ink};--page-muted:${t.muted};--accent:${t.accent}` : ''; }
 function creditStyle(t, n) { if (!t || !t.palette) return ''; const c = t.palette[(n - 1) % t.palette.length]; return ` style="background:${c};--page-ink:#fff;--page-muted:rgba(255,255,255,.8);--accent:#fff;color:#fff"`; }
+const ORN_SHAPES = { none: [] };
+function ornSvg(type, num) {
+  const L = D.proof?.layout; const o = L?.ornament; if (!o || o.key === 'none' || !L.orn) return '';
+  const t = L.theme || {}; let c = o.color === 'accent' ? (t.accent || '#B0123B') : o.color;
+  if (type === 'credit' && t.palette && o.color === 'accent') c = '#FFFFFF';
+  return `<svg class="orn" viewBox="0 0 850 1100" preserveAspectRatio="none" aria-hidden="true">${L.orn.map(s => s.fill ? `<path d="${s.d}" fill="${c}" fill-opacity="${s.op ?? 1}"/>` : `<path d="${s.d}" fill="none" stroke="${c}" stroke-opacity="${s.op ?? 1}" stroke-width="${s.w || 1.5}"/>`).join('')}</svg>`;
+}
 function pageHtml(p, idx) {
   const n = idx + 1, side = n % 2 ? 'r' : 'l', fol = p.type === 'blank' ? '' : `<span class="fol ${side}">${String(n).padStart(2, '0')}</span>`;
   const cnt = D.comments.filter(c => c.page === n).length; const badge = cnt ? `<span class="cnt">${cnt} comment${cnt > 1 ? 's' : ''}</span>` : '';
   const sel = selPage === n ? ' sel' : '';
-  if (p.type === 'photo') return `<div class="pg${sel}" data-page="${n}"><img class="${p.mode}" src="${esc(p.url)}" alt="">${p.tooSmall ? '<span class="lr">TOO SMALL</span>' : p.lowRes ? '<span class="lr">MAY PRINT SOFT</span>' : ''}${badge}${fol}</div>`;
-  if (p.type === 'credit') return `<div class="pg${sel}" data-page="${n}"${creditStyle(D.proof?.layout?.theme, p.num)}><div class="in"><div class="num">${String(p.num).padStart(2, '0')}</div><div class="kind">${esc(p.kind)}</div><div class="ttl">${esc(p.title)}</div><dl>${p.credits.map(c => `<dt>${esc(c.label)}</dt><dd>${esc(c.value)}</dd>`).join('')}</dl>${p.story ? `<div class="story">${esc(p.story)}</div>` : ''}</div>${badge}${fol}</div>`;
-  if (p.type === 'bio') return `<div class="pg${sel}" data-page="${n}"><div class="in"><div class="ttl" style="font-size:8cqw">${esc(p.name)}</div><div class="kind">${esc(p.role)}</div><div class="bio">${esc(p.bio)}</div><dl style="margin-top:auto">${p.facts.map(f => `<dt>${esc(f[0])}</dt><dd>${esc(f[1])}</dd>`).join('')}</dl></div>${badge}${fol}</div>`;
-  if (p.type === 'closing') return `<div class="pg closing${sel}" data-page="${n}"><div class="in"><div class="ttl">${esc(p.name)}</div><div class="kind">${esc(p.contact)}</div><div class="kind">${esc(p.website)}</div></div>${badge}</div>`;
+  if (p.type === 'photo' && p.mode === 'duo') return `<div class="pg${sel}" data-page="${n}"><div class="duo">${p.items.map(it => `<img src="${esc(it.url)}" alt="">`).join('')}</div>${p.tooSmall ? '<span class="lr">TOO SMALL</span>' : ''}${badge}${fol}</div>`;
+  if (p.type === 'photo') return `<div class="pg${sel}" data-page="${n}"><img class="${p.mode}" src="${esc(p.url)}" alt="">${p.tooSmall ? '<span class="lr">TOO SMALL</span>' : ''}${badge}${fol}</div>`;
+  if (p.type === 'credit') return `<div class="pg${sel}" data-page="${n}"${creditStyle(D.proof?.layout?.theme, p.num)}>${ornSvg('credit', p.num)}<div class="in"><div class="num">${String(p.num).padStart(2, '0')}</div><div class="kind">${esc(p.kind)}</div><div class="ttl">${esc(p.title)}</div><dl>${p.credits.map(c => `<dt>${esc(c.label)}</dt><dd>${esc(c.value)}</dd>`).join('')}</dl>${p.story ? `<div class="story">${esc(p.story)}</div>` : ''}</div>${badge}${fol}</div>`;
+  if (p.type === 'bio') return `<div class="pg${sel}" data-page="${n}">${ornSvg('bio')}<div class="in"><div class="ttl" style="font-size:8cqw">${esc(p.name)}</div><div class="kind">${esc(p.role)}</div><div class="bio">${esc(p.bio)}</div><dl style="margin-top:auto">${p.facts.map(f => `<dt>${esc(f[0])}</dt><dd>${esc(f[1])}</dd>`).join('')}</dl></div>${badge}${fol}</div>`;
+  if (p.type === 'closing') return `<div class="pg closing${sel}" data-page="${n}">${ornSvg('closing')}<div class="in"><div class="ttl">${esc(p.name)}</div><div class="kind">${esc(p.contact)}</div><div class="kind">${esc(p.website)}</div></div>${badge}</div>`;
   return `<div class="pg blank" data-page="${n}"></div>`;
 }
 function payBox() {
@@ -344,7 +356,7 @@ function paneProof() {
     ${open ? `<div class="card" style="background:var(--bg)" id="cbox"><h3>${selPage ? 'Comment on page ' + selPage : 'General comment'}</h3><textarea id="ctext" placeholder="What should we change?"></textarea><div class="row"><button class="btn" id="csend">Add comment</button>${selPage ? '<button class="btn ghost" id="cgen">Make it a general comment</button>' : ''}</div></div>` : ''}
     ${D.comments.length ? `<div class="comments"><h3>Comments</h3>${D.comments.map(c => `<div class="cm">${c.page ? `<b>Page ${c.page}:</b> ` : ''}${esc(c.body)}</div>`).join('')}</div>` : ''}
     ${open ? `<div class="card" style="background:var(--bg)"><h3>Your decision</h3>
-      ${flagged ? `<label class="chk"><input type="checkbox" id="acc"> I’ve seen the ${flagged} photo${flagged > 1 ? 's' : ''} marked MAY PRINT SOFT or TOO SMALL and I accept ${flagged > 1 ? 'them' : 'it'} as is.</label>` : ''}
+      ${flagged ? `<label class="chk"><input type="checkbox" id="acc"> I’ve seen the ${flagged} photo${flagged > 1 ? 's' : ''} marked TOO SMALL and I accept ${flagged > 1 ? 'them' : 'it'} as is.</label>` : ''}
       <label>Note (optional)<textarea id="dnote" style="min-height:60px"></textarea></label>
       <div class="row"><button class="btn primary" id="approve">Approve for print</button><button class="btn" id="changes">Ask for changes</button></div></div>` : ''}
   </div>`;

@@ -1,4 +1,4 @@
-# BOOKD — v1.12
+# BOOKD — v1.15
 
 Public site (5 languages) + performer portal + admin back office (English).
 
@@ -107,3 +107,15 @@ Test card: **4242 4242 4242 4242**, any future date, any CVC, any postal code. P
 - Performer portal: a **"How to build your book"** guide at the top of Shoots & photos, a **"Your cover"** box showing the chosen cover, and a clear bar under every photo: **◀ ▶** (move), **★ Cover**, **✕** (remove). **↑ Move up / ↓ Move down** on each shoot. The order on screen is the order in the book.
 - Admin: the same **◀ ▶** on each photo and **↑ ↓** on each shoot; then "Build new proof".
 - The cover is chosen among the uploaded photos (no separate upload) and is not repeated inside the book.
+
+## v1.13 — One resolution flag only
+- A photo is flagged only when it would clearly print badly: under 800 px on the short side (below ~90 dpi) = **TOO SMALL**. No other label. Instagram downloads pass. (Change `SMALL_PX` in `lib/pricing.js` to move the line.)
+
+## v1.14 — Decorations
+- **Decoration** panel on each order (admin), under Book design: vector graphics for the text pages (bio, credits, last page): **None, Swish, Fine lines, Corners, Circles, Dot grid**, each with a mini preview, plus a **colour** (design colour, gold, black, white, rose, sage, blue). Photos stay clean and full page.
+- The PDF and the online proof draw exactly the same shapes. On Couleur's coloured credit pages, the "design colour" decoration turns white.
+- New file: `lib/ornaments.js` (shapes are SVG paths on an 850 x 1100 page; add a new decoration there).
+
+## v1.15 — Page layout: Full page, Mix, Gallery
+- In the **Book design** panel (admin), a **Page layout** choice per order: **Full page** (every photo fills the page, default), **Mix** (like the demo book: full pages, pages of two photos side by side, and framed photos), **Gallery** (every photo framed with a white border).
+- In Mix, each shoot opens with a full-page photo after its credit page. The PDF and the online proof match.
