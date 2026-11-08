@@ -1,15 +1,17 @@
 // api/portal/[action].js — the performer's private page (identified by the order token, no account needed)
 import { q, one, ensureSchema, logEvent, hasDb } from '../../lib/db.js';
-import { readJson, readRaw, fail, clip, siteUrl, handle } from '../../lib/http.js';
+import { readJson, readRaw, fail, clip, siteUrl, handle, isEmail } from '../../lib/http.js';
 import { sendMail, adminInbox } from '../../lib/mail.js';
 import { savePublic, removePublic, canClientUpload } from '../../lib/storage.js';
-import { PACKAGES, isLowRes, isTooSmall, upgradeSurcharge } from '../../lib/pricing.js';
+import { PACKAGES, isLowRes, isTooSmall, upgradeSurcharge, shippingFor } from '../../lib/pricing.js';
+import { countryCode } from '../../lib/lulu.js';
+import { hasStripe as stripeOn } from '../../lib/stripe.js';
 import { KIND_LABELS } from '../../lib/layout.js';
 import { balanceDue } from '../../lib/orders.js';
 import { buildProof } from '../../lib/proofs.js';
 import { hasStripe } from '../../lib/stripe.js';
 
-const LOCKED = ['approved', 'printing', 'shipped', 'delivered', 'cancelled'];
+const LOCKED = ['approved', 'paid', 'printing', 'shipped', 'delivered', 'cancelled'];
 const PROFILE_KEYS = ['name', 'role', 'bio', 'height', 'languages', 'agency', 'city', 'contact', 'website'];
 const SHIP_KEYS = ['ship_name', 'ship_address', 'ship_city', 'ship_region', 'ship_postal', 'ship_country', 'phone'];
 
@@ -191,6 +193,19 @@ export default async function handler(req, res) {
         await q(`UPDATE orders SET status=$1, updated_at=now() WHERE id=$2`, [approve ? 'approved' : 'changes', order.id]);
         if (clip(body.note)) await q('INSERT INTO proof_comments (proof_id, page, body, author) VALUES ($1,NULL,$2,$3)', [p.id, clip(body.note, 1500), order.customer_name || 'Customer']);
         await logEvent(order.id, 'customer', approve ? `Proof v${p.version} APPROVED (flagged photos accepted as is)` : `Changes requested on proof v${p.version}`);
+        if (approve) { // set the shipping from the delivery country (same rates as the website estimator) so the balance can be paid right away
+          const o2 = await one('SELECT * FROM orders WHERE id=$1', [order.id]);
+          if (o2.shipping_usd == null && countryCode(o2.ship_country)) {
+            const ship = shippingFor(countryCode(o2.ship_country), o2.copies);
+            await q('UPDATE orders SET shipping_usd=$1 WHERE id=$2', [ship, order.id]);
+            await logEvent(order.id, 'system', `Shipping set to $${ship} USD (${o2.ship_country}, ${o2.copies} cop${o2.copies > 1 ? 'ies' : 'y'})`);
+            o2.shipping_usd = ship;
+          }
+          const due = balanceDue(o2);
+          if (!o2.balance_paid && due > 0 && o2.shipping_usd != null && stripeOn() && isEmail(o2.customer_email))
+            await sendMail({ to: o2.customer_email, subject: `Your BOOKD book is approved — balance to pay (${o2.ref})`,
+              text: `Hello ${o2.customer_name || ''},\n\nThank you for approving your proof! Your book goes to print as soon as the balance is paid: $${due.toFixed(2)} USD (book + shipping − what you already paid).\n\nPay it securely here:\n${siteUrl(req)}/my/?t=${o2.token}#proof\n\nBOOKD` });
+        }
         await sendMail({ to: adminInbox(), subject: `[BOOKD] ${order.ref} — proof v${p.version} ${approve ? 'APPROVED' : 'changes requested'}`,
           text: `${order.customer_name} ${approve ? 'approved' : 'requested changes on'} proof v${p.version}.${body.note ? `\n\nNote: ${body.note}` : ''}\n\nOpen the admin: ${siteUrl(req)}/admin/#order/${order.id}` });
         return res.json({ ok: true });

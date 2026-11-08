@@ -1,4 +1,4 @@
-# BOOKD — v1.21
+# BOOKD — v1.22
 
 Public site (5 languages) + performer portal + admin back office (English).
 
@@ -145,3 +145,9 @@ Test card: **4242 4242 4242 4242**, any future date, any CVC, any postal code. P
 ## v1.21 — Reading copy in double pages
 - Each proof now also produces a **book preview PDF**: page 1 = the open cover (back, spine, front), then double pages trimmed to the final size, first page alone on the right like a real book. Opens as spreads in any PDF viewer.
 - Performer portal: **Download PDF (double pages)** opens this preview. Admin: **Book preview (spreads) ↗** next to the Interior and Cover PDFs. The print files sent to Lulu are unchanged.
+
+## v1.22 — Approve, then pay, then print
+- New status **Approved & paid** between Approved and Printing.
+- When the performer approves the proof, the shipping is set automatically from the delivery country (same rates as the website estimator, +50% per extra copy) and the performer gets an email with the balance and the payment link; the portal shows "Pay the balance" right away.
+- When the balance is paid (Stripe, or "Balance paid" ticked in the admin for another payment method), the order moves to **Approved & paid** and the admin gets a "ready to print" email.
+- **Send to Lulu** stays locked until the balance is paid; the Print with Lulu panel says how much is still due.

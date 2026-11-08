@@ -111,6 +111,9 @@ export default async function handler(req, res) {
         if (!sets.length) return res.json({ ok: true });
         vals.push(id);
         await q(`UPDATE orders SET ${sets.join(', ')}, updated_at=now() WHERE id=$${vals.length}`, vals);
+        if (body.balance_paid === true && !cur.balance_paid && cur.status === 'approved' && !body.status) {
+          await q(`UPDATE orders SET status='paid' WHERE id=$1`, [id]); await logEvent(id, who, 'Balance marked as paid — status: Approved & paid');
+        }
         if (body.status && body.status !== cur.status) await logEvent(id, who, `Status: ${cur.status} → ${body.status}`);
         else if (body.template && Object.keys(body).length <= 2) await logEvent(id, who, `Book design: ${TEMPLATES[templateKey(body.template)].label}`);
         else await logEvent(id, who, 'Order details updated');
@@ -238,6 +241,7 @@ export default async function handler(req, res) {
         catch (e) { return fail(res, 400, e.message); }
         const costTxt = `${qt.total.toFixed(2)} ${qt.currency} incl. tax (books ${qt.books.toFixed(2)} + shipping ${qt.shipping.toFixed(2)} + fee ${qt.fulfillment.toFixed(2)} + tax ${qt.tax.toFixed(2)}, ${level})`;
         if (action === 'printer-quote') return res.json({ ok: true, quote: qt, level, text: costTxt, env: lulu.luluEnv() });
+        if (!o.balance_paid && !body.force) return fail(res, 400, `The balance isn't paid yet ($${balanceDue(o).toFixed(2)} USD). The customer pays it from their page after approving; for another payment method, tick "Balance paid" in the order details.`);
         if (o.printer_order_id && /^Lulu/.test(o.printer || '') && !['CANCELED', 'REJECTED', 'ERROR'].includes(o.printer_status) && !body.force)
           return fail(res, 400, `Already sent to Lulu (print job ${o.printer_order_id}, ${o.printer_status || 'status unknown'}).`);
         const toAbs = (u) => /^https?:/.test(u) ? u : siteUrl(req) + u;
@@ -247,7 +251,7 @@ export default async function handler(req, res) {
         catch (e) { await logEvent(o.id, who, 'Lulu refused the print job: ' + e.message); return fail(res, 400, e.message); }
         const env = lulu.luluEnv();
         await q(`UPDATE orders SET printer=$1, printer_order_id=$2, printer_status=$3, printer_env=$4, printer_cost=$5, ship_level=$6, printer_sent_at=now(),
-          status = CASE WHEN status IN ('approved','proof_sent','layout','changes') THEN 'printing' ELSE status END, updated_at=now() WHERE id=$7`,
+          status = CASE WHEN status IN ('approved','paid','proof_sent','layout','changes') THEN 'printing' ELSE status END, updated_at=now() WHERE id=$7`,
           [env === 'production' ? 'Lulu' : 'Lulu (sandbox)', String(job.id), job.status?.name || 'CREATED', env, costTxt, level, o.id]);
         await logEvent(o.id, who, `Sent to Lulu${env === 'production' ? '' : ' SANDBOX (test, not printed)'}: print job ${job.id}, proof v${p.version}, ${o.copies || 1} cop${(o.copies || 1) > 1 ? 'ies' : 'y'}, ${level}. Quote ${costTxt}`);
         return res.json({ ok: true, jobId: job.id, status: job.status?.name, env, text: costTxt });
