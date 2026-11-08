@@ -3,7 +3,7 @@ import { q, one, ensureSchema, logEvent, hasDb } from '../../lib/db.js';
 import { readJson, readRaw, fail, clip, siteUrl, handle } from '../../lib/http.js';
 import { sendMail, adminInbox } from '../../lib/mail.js';
 import { savePublic, removePublic, canClientUpload } from '../../lib/storage.js';
-import { PACKAGES, isLowRes, isTooSmall } from '../../lib/pricing.js';
+import { PACKAGES, isLowRes, isTooSmall, upgradeSurcharge } from '../../lib/pricing.js';
 import { KIND_LABELS } from '../../lib/layout.js';
 import { balanceDue } from '../../lib/orders.js';
 import { hasStripe } from '../../lib/stripe.js';
@@ -41,7 +41,7 @@ export default async function handler(req, res) {
       const comments = proof ? await q('SELECT id, page, body, author, created_at FROM proof_comments WHERE proof_id=$1 ORDER BY created_at', [proof.id]) : [];
       const pkg = PACKAGES[order.package] || PACKAGES.signature;
       return res.json({ ok: true, uploadMode: canClientUpload() ? 'blob' : 'direct', kinds: KIND_LABELS,
-        order: { ref: order.ref, status: order.status, locked, customer_name: order.customer_name, package: order.package, packageLabel: pkg.label, maxPhotos: pkg.maxPhotos, pages: pkg.pages, copies: order.copies,
+        order: { ref: order.ref, status: order.status, locked, customer_name: order.customer_name, package: order.package, packageLabel: pkg.label, maxPhotos: pkg.maxPhotos, pages: pkg.pages, packages: Object.fromEntries(Object.entries(PACKAGES).map(([k, p]) => [k, { label: p.label, maxPhotos: p.maxPhotos, pages: p.pages, price: p.price, cover: p.cover, upgrade: p.maxPhotos > pkg.maxPhotos ? upgradeSurcharge(order.package, k, order.copies) : null }])), copies: order.copies,
           profile: order.profile || {}, ship: Object.fromEntries(SHIP_KEYS.map(k => [k, order[k] || ''])), submitted_at: order.submitted_at,
           pay: { online: hasStripe(), price: order.price_usd == null ? null : +order.price_usd, shipping: order.shipping_usd == null ? null : +order.shipping_usd,
             paid: +(order.paid_usd || order.deposit_usd || 0), deposit_paid: !!order.deposit_paid, balance_paid: !!order.balance_paid, due: balanceDue(order) } },
@@ -134,6 +134,15 @@ export default async function handler(req, res) {
         await q(`UPDATE photos SET role=NULL WHERE order_id=$1 AND role='cover'`, [order.id]);
         await q(`UPDATE photos SET role='cover' WHERE id=$1`, [p.id]); return res.json({ ok: true });
       }
+      case 'upgrade': { // move up to a bigger package: no payment now, the extra printing is added to the balance
+        const cur = PACKAGES[order.package] || PACKAGES.signature, to = PACKAGES[body.to];
+        if (!to || to.maxPhotos <= cur.maxPhotos) return fail(res, 400, 'Please choose a bigger package');
+        const add = upgradeSurcharge(order.package, body.to, order.copies);
+        await q('UPDATE orders SET package=$1, price_usd=coalesce(price_usd,0)+$2, updated_at=now() WHERE id=$3', [body.to, add, order.id]);
+        await logEvent(order.id, 'customer', `Upgraded ${cur.label} → ${to.label}: +$${add} USD added to the balance (extra printing only)`);
+        await sendMail({ to: adminInbox(), subject: `[BOOKD] ${order.ref} — upgraded to ${to.label} (+$${add})`, text: `${order.customer_name} moved up to ${to.label}. +$${add} USD added to the balance.\n\n${siteUrl(req)}/admin/#order/${order.id}` });
+        return res.json({ ok: true, added: add });
+      }
       case 'photo-move': {
         const ids = (body.order || []).map(n => parseInt(n, 10));
         for (let i = 0; i < ids.length; i++) await q('UPDATE photos SET position=$1 WHERE id=$2 AND order_id=$3', [i + 1, ids[i], order.id]);
@@ -142,6 +151,8 @@ export default async function handler(req, res) {
       case 'submit': {
         const n = (await one('SELECT count(*)::int AS n FROM photos WHERE order_id=$1', [order.id])).n;
         if (!n) return fail(res, 400, 'Add at least one photo first');
+        const maxP = (PACKAGES[order.package] || PACKAGES.signature).maxPhotos;
+        if (n > maxP) return fail(res, 400, `Your package includes ${maxP} photos and you have ${n}. Please remove ${n - maxP} photo(s), or write to us to move up to a bigger package.`);
         await q(`UPDATE orders SET submitted_at=now(), status = CASE WHEN status IN ('new','collecting','changes') THEN 'layout' ELSE status END, updated_at=now() WHERE id=$1`, [order.id]);
         await logEvent(order.id, 'customer', `Photos submitted for layout (${n} photos)`);
         await sendMail({ to: adminInbox(), subject: `[BOOKD] ${order.ref} — photos submitted for layout`, text: `${order.customer_name} sent ${n} photos for layout.\n\nOpen the admin: ${siteUrl(req)}/admin/#order/${order.id}` });

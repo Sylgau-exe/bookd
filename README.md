@@ -1,4 +1,4 @@
-# BOOKD — v1.16
+# BOOKD — v1.19
 
 Public site (5 languages) + performer portal + admin back office (English).
 
@@ -123,3 +123,16 @@ Test card: **4242 4242 4242 4242**, any future date, any CVC, any postal code. P
 ## v1.16 — Photographer photo or logo on the credit page
 - Each shoot can have an optional **photo of the photographer** (shown round) or a **company logo** (shown as is, PNG with transparency works), uploaded under the credits in the performer portal ("Add a photo of the photographer" / "Add a logo", Replace, Remove). JPG or PNG under 4 MB.
 - It prints small under the credits on that shoot's credit page, and shows the same in the online proof.
+
+## v1.17 — Photo count per package
+- Performer portal: a counter with a bar at the top of Shoots & photos ("10 of 18 photos · 8 more you can add"). At the limit it turns orange ("your package is full"), over the limit red ("please remove N photos"), and suggests the next package up.
+- Uploading past the limit asks for confirmation first. "Send for layout" is refused while there are too many photos (also checked on the server).
+
+## v1.18 — Upgrade button
+- When the package is full or over its photo limit, the portal shows **"Upgrade to [next package] · +$X USD"**. The customer pays only the difference on Stripe; the order switches to the bigger package automatically (price, photo limit, pages, cover), the payment is added to "paid online", the timeline notes it and you get an email. Possible until the proof is approved.
+- Without Stripe keys, the message asks the customer to write in instead.
+
+## v1.19 — Upgrade = extra printing only, added to the balance
+- "Upgrade to [next package]" no longer opens a payment. One click (with a confirmation) switches the order to the bigger package and adds only the extra printing to the price: Lulu print difference + 30% markup, rounded up, per copy (Essentiel → Signature +$3, Signature → Prestige +$19, Essentiel → Prestige +$22). No extra design cost. It is paid with the balance after the proof is approved.
+- Values in `lib/pricing.js` (`PRINT_USD`, `UPGRADE_MARKUP`).
+- **New prices (USD):** Essentiel $129, **Signature $132**, **Prestige $151** (= Essentiel + the extra printing), so buying a bigger package directly costs the same as upgrading. Extra copies unchanged ($59 / $69 / $119). Website and back office updated.
