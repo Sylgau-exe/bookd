@@ -208,9 +208,9 @@ function route() {
 }
 
 /* ---------- dialog helper ---------- */
-function openDialog(html, onSubmit) {
+function openDialog(html, onSubmit, okLabel = 'Save') {
   const d = $('#dlg'), f = $('#dlg-form');
-  f.innerHTML = html + `<div class="warnbox" id="dlg-err" hidden></div><div class="row" style="justify-content:flex-end"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" value="ok" id="dlg-ok">Save</button></div>`;
+  f.innerHTML = html + `<div class="warnbox" id="dlg-err" hidden></div><div class="row" style="justify-content:flex-end"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" value="ok" id="dlg-ok">${esc(okLabel)}</button></div>`;
   f.onsubmit = async e => {
     if (e.submitter && e.submitter.value === 'cancel') return;
     e.preventDefault();
@@ -345,7 +345,7 @@ async function viewOrder(id) {
     try { await post('order-update', body); toast('Saved'); reload(); } catch (err) { toast(err.message); }
   };
   $('#recalc').onclick = async () => { const f = new FormData($('#details')); await post('order-update', { id, package: f.get('package'), copies: f.get('copies'), recalcPrice: true }); toast('Price recalculated'); reload(); };
-  $('#del').onclick = () => openDialog(`<h2>Delete ${esc(o.ref)}?</h2><p>This removes the order, its shoots, photos, proof PDFs and timeline, including the stored files. This can’t be undone.</p>`, async () => { await post('order-delete', { id }); toast('Order deleted'); location.hash = 'orders'; });
+  $('#del').onclick = () => openDialog(`<h2>Delete ${esc(o.ref)}?</h2><p>This removes the order, its shoots, photos, proof PDFs and timeline, including the stored files. This can’t be undone.</p>`, async () => { await post('order-delete', { id }); toast('Order deleted'); location.hash = 'orders'; }, 'Delete');
   $('#add-note').onclick = async () => { const t = $('#note').value.trim(); if (!t) return; await post('note', { id, text: t }); reload(); };
   $('#build').onclick = async () => {
     const b = $('#build'); b.disabled = true; b.textContent = 'Building PDFs…';
@@ -462,10 +462,10 @@ function bindLulu(id, reload, d0) {
   go('#lulu-quote', 'printer-quote', null, r => { out(`<div class="small"><b>Lulu price (${esc(r.env)}):</b> ${esc(r.text)}</div>`); $('#lulu-quote').disabled = false; });
   const sendBtn = $('#lulu-send');
   if (sendBtn) sendBtn.onclick = () => openDialog(`<h2>Send to Lulu?</h2><p>${META.lulu?.env === 'production' ? '<b>This is the LIVE account: the book will be printed and shipped, and Lulu will charge your card.</b>' : 'Sandbox: a test print job is created. Nothing is printed or charged.'}</p><p>Shipping: <b>${esc(lvl())}</b>.</p>${META.stripe?.configured && !d0.order.balance_paid ? '<div class="warnbox">The customer has not paid the balance yet.</div>' : ''}`, async () => {
-    const r = await post('printer-send', { id, level: lvl() }); toast(`Lulu print job ${r.jobId} created`); reload(); });
+    const r = await post('printer-send', { id, level: lvl() }); toast(`Lulu print job ${r.jobId} created`); reload(); }, 'Send to Lulu');
   go('#lulu-refresh', 'printer-refresh', null, r => { toast('Lulu status: ' + r.status); reload(); });
   const c = $('#lulu-cancel');
-  if (c) c.onclick = () => openDialog('<h2>Cancel the Lulu print job?</h2><p>Only possible before it is paid.</p>', async () => { await post('printer-cancel', { id }); toast('Print job cancelled'); reload(); });
+  if (c) c.onclick = () => openDialog('<h2>Cancel the Lulu print job?</h2><p>Only possible before it is paid.</p>', async () => { await post('printer-cancel', { id }); toast('Print job cancelled'); reload(); }, 'Cancel the job');
 }
 function confirmTracking(o) { return true; }
 

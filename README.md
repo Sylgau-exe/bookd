@@ -1,4 +1,4 @@
-# BOOKD — v1.22
+# BOOKD — v1.23
 
 Public site (5 languages) + performer portal + admin back office (English).
 
@@ -151,3 +151,7 @@ Test card: **4242 4242 4242 4242**, any future date, any CVC, any postal code. P
 - When the performer approves the proof, the shipping is set automatically from the delivery country (same rates as the website estimator, +50% per extra copy) and the performer gets an email with the balance and the payment link; the portal shows "Pay the balance" right away.
 - When the balance is paid (Stripe, or "Balance paid" ticked in the admin for another payment method), the order moves to **Approved & paid** and the admin gets a "ready to print" email.
 - **Send to Lulu** stays locked until the balance is paid; the Print with Lulu panel says how much is still due.
+
+## v1.23 — Lulu print job fix
+- Fix: Lulu refused the print job ("printable_normalization.pod_package_id: This field is required"). The package code now sits inside `printable_normalization`, as the Lulu API requires. The delivery address always carries an email (the customer's, otherwise LULU_CONTACT_EMAIL / CONTACT_TO), also required by Lulu.
+- Confirmation buttons now say what they do ("Send to Lulu", "Cancel the job", "Delete") instead of "Save".
