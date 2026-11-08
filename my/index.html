@@ -168,7 +168,7 @@ function render() {
     ${PAID === 'deposit' ? `<div class="ok">Payment received — your book is reserved. We also emailed you this private link so you can come back any time.</div>` : ''}
     ${PAID === 'balance' ? `<div class="ok">Balance received — thank you! Your book goes to print now.</div>` : ''}
     ${PAID === 'upgrade' ? `<div class="ok">Done — your book is now ${esc(D.order.packageLabel)}: up to ${D.order.maxPhotos} photos. The extra printing is added to your balance.</div>` : ''}
-    ${D.order.locked && PAID !== 'balance' ? `<div class="ok">Your book is approved and in production. Thank you!</div>` : ''}
+    ${D.order.locked && PAID !== 'balance' ? (D.order.pay && D.order.pay.online && !D.order.pay.balance_paid && D.order.pay.due > 0 ? `<div class="ok">Your book is approved. Pay the balance in “Your proof” and we send it to print.</div>` : `<div class="ok">Your book is approved and in production. Thank you!</div>`) : ''}
     <nav class="steps">${names.map(([k, l], i) => `<a href="#${k}" data-step="${k}" class="${step === k ? 'on' : ''} ${done[k] ? 'done' : ''}"><b>0${i + 1}</b>${l}</a>`).join('')}</nav>
     <section id="pane"></section>`;
   $('.steps').onclick = e => { const a = e.target.closest('a[data-step]'); if (!a) return; e.preventDefault(); step = a.dataset.step; render(); };
@@ -391,7 +391,7 @@ function payBox() {
   if (!p.online || p.price == null) return '';
   if (p.balance_paid) return `<div class="ok">Paid in full (${usd(p.paid)}). Thank you!</div>`;
   if (p.shipping == null) return `<div class="warn">Paid so far: ${usd(p.paid)}. We’re confirming your shipping cost and will email you the final amount.</div>`;
-  return `<div class="card" style="background:var(--bg)"><h3>Balance</h3><p class="muted">Book ${usd(p.price)} + shipping ${usd(p.shipping)} − paid ${usd(p.paid)} = <b>${usd(p.due)}</b></p>
+  return `<div class="card" style="background:var(--bg)"><h3>Balance</h3><p class="muted">Book ${usd(p.price)} + shipping ${usd(p.shipping)}${p.discount ? ` − ${p.discount}% discount (${usd((p.price + p.shipping) * p.discount / 100)})` : ''} − paid ${usd(p.paid)} = <b>${usd(p.due)}</b></p>
     <div class="row"><button class="btn primary" id="paybal">Pay the balance</button></div></div>`;
 }
 function paneProof() {
@@ -403,7 +403,7 @@ function paneProof() {
   $('#pane').innerHTML = `<div class="card">
     <div class="row" style="justify-content:space-between"><h2>Your proof — version ${P.version}</h2><a class="btn ghost" href="${esc(P.preview_url || P.interior_url)}" target="_blank" rel="noopener">Download PDF (double pages) ↗</a></div>
     ${refreshBox(P)}
-    ${P.status === 'approved' ? `<div class="ok">You approved this proof. We’re sending it to print.</div>${payBox()}` : P.status === 'changes' ? `<div class="warn">You asked for changes. We’ll send you a new version soon.</div>` : `<p class="muted">Flip through your book below. Tap a page to comment on it. When you’re happy, approve it at the bottom. Nothing is printed before you approve.</p>`}
+    ${P.status === 'approved' ? `<div class="ok">${D.order.pay && D.order.pay.online && !D.order.pay.balance_paid && D.order.pay.due > 0 ? 'You approved this proof. Pay the balance below and we send it to print.' : 'You approved this proof. We’re sending it to print.'}</div>${payBox()}` : P.status === 'changes' ? `<div class="warn">You asked for changes. We’ll send you a new version soon.</div>` : `<p class="muted">Flip through your book below. Tap a page to comment on it. When you’re happy, approve it at the bottom. Nothing is printed before you approve.</p>`}
     ${L.cover ? `<div><div class="eyebrow" style="margin-bottom:6px">Cover</div><div class="pg cover-prev" style="cursor:default"><img class="full" src="${esc(L.cover.url)}" alt=""><div class="in" style="justify-content:flex-end;color:#fff"><div class="ttl" style="font-size:10cqw">${esc(L.cover.name)}</div><div class="kind" style="color:#fff">${esc(L.cover.role)}</div></div></div></div>` : ''}
     <div id="spreads" class="${tplClass(L.theme)}" style="${tplVars(L.theme)}">${spreads.map(([a, b], i) => `<div class="spread">${a ? pageHtml(a, pages.indexOf(a)) : '<div aria-hidden="true"></div>'}${b ? pageHtml(b, pages.indexOf(b)) : '<div aria-hidden="true"></div>'}</div>`).join('')}</div>
     ${open ? `<div class="card" style="background:var(--bg)" id="cbox"><h3>${selPage ? 'Comment on page ' + selPage : 'General comment'}</h3><textarea id="ctext" placeholder="What should we change?"></textarea><div class="row"><button class="btn" id="csend">Add comment</button>${selPage ? '<button class="btn ghost" id="cgen">Make it a general comment</button>' : ''}</div></div>` : ''}

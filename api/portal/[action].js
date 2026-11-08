@@ -47,7 +47,7 @@ export default async function handler(req, res) {
         order: { ref: order.ref, status: order.status, locked, customer_name: order.customer_name, package: order.package, packageLabel: pkg.label, maxPhotos: pkg.maxPhotos, pages: pkg.pages, packages: Object.fromEntries(Object.entries(PACKAGES).map(([k, p]) => [k, { label: p.label, maxPhotos: p.maxPhotos, pages: p.pages, price: p.price, cover: p.cover, upgrade: p.maxPhotos > pkg.maxPhotos ? upgradeSurcharge(order.package, k, order.copies) : null }])), copies: order.copies,
           content_at: order.content_at, profile: order.profile || {}, ship: Object.fromEntries(SHIP_KEYS.map(k => [k, order[k] || ''])), submitted_at: order.submitted_at,
           pay: { online: hasStripe(), price: order.price_usd == null ? null : +order.price_usd, shipping: order.shipping_usd == null ? null : +order.shipping_usd,
-            paid: +(order.paid_usd || order.deposit_usd || 0), deposit_paid: !!order.deposit_paid, balance_paid: !!order.balance_paid, due: balanceDue(order) } },
+            paid: +(order.paid_usd || order.deposit_usd || 0), discount: +(order.discount_pct || 0), deposit_paid: !!order.deposit_paid, balance_paid: !!order.balance_paid, due: balanceDue(order) } },
         shoots, photos, proof, comments });
     }
     const body = req.method === 'POST' && !['upload', 'shoot-image'].includes(action) ? await readJson(req) : {};

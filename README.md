@@ -1,4 +1,4 @@
-# BOOKD — v1.24
+# BOOKD — v1.25
 
 Public site (5 languages) + performer portal + admin back office (English).
 
@@ -160,3 +160,9 @@ Test card: **4242 4242 4242 4242**, any future date, any CVC, any postal code. P
 - Fix: Lulu rejected print job 361222 ("One or more line-items were rejected"). The PDFs used the 14 standard PDF fonts, which are not embedded; Lulu requires every font to be embedded. The PDFs now embed Liberation Serif / Sans (free SIL OFL fonts in `fonts/`, same metrics as Times / Helvetica, so the pages look identical). New dependency: `@pdf-lib/fontkit`.
 - An approved proof made before this fix gets its print files regenerated automatically when you click "Send to Lulu" (same layout, same photos, approval kept).
 - "Refresh status" now shows Lulu's detailed reason when a job is rejected, and the panel explains how to resend.
+
+## v1.25 — Secret discount code
+- New Vercel environment variable **DISCOUNT_CODES**, e.g. `M3TEST:90` (code:percent, several separated by commas). The code is never shown on the site.
+- Use it through a private link: `https://<site>/?code=M3TEST`. A small "Private code applied: −90%" note appears; the link hides the code from the address bar.
+- The discount applies to the book and the shipping (deposit and balance). The admin order shows a "Private code −90%" pill; the timeline logs it; the performer's balance line shows the discount.
+- Customer page wording: after approving, says "Pay the balance … and we send it to print" until the balance is paid.
