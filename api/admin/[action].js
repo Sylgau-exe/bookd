@@ -1,11 +1,11 @@
 // api/admin/[action].js — BOOKD back office API (English only). All actions except setup/login need an admin token.
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
-import { q, one, ensureSchema, logEvent, hasDb } from '../../lib/db.js';
+import { q, one, ensureSchema, logEvent, hasDb, getSetting, setSetting } from '../../lib/db.js';
 import { readJson, fail, clip, isEmail, siteUrl, handle } from '../../lib/http.js';
 import { sign, requireAdmin } from '../../lib/auth.js';
 import { sendMail } from '../../lib/mail.js';
-import { PACKAGES, priceFor, STATUSES, isLowRes, isTooSmall } from '../../lib/pricing.js';
+import { PACKAGES, priceFor, STATUSES, isLowRes, isTooSmall, COVERS, HARD_SURCHARGE, HARD_EXTRA_SURCHARGE, normCover, coverOf, coverLabel } from '../../lib/pricing.js';
 import { buildLayout } from '../../lib/layout.js';
 import { buildPdfs } from '../../lib/pdf.js';
 import { savePublic, removePublic, hasBlob } from '../../lib/storage.js';
@@ -19,7 +19,7 @@ import { hasStripe, stripeMode } from '../../lib/stripe.js';
 const token = () => crypto.randomBytes(24).toString('hex');
 const STATUS_KEYS = STATUSES.map(s => s[0]);
 const EDITABLE = ['status', 'customer_name', 'customer_email', 'phone', 'lang', 'package', 'copies', 'price_usd', 'shipping_usd', 'deposit_paid', 'balance_paid',
-  'ship_name', 'ship_address', 'ship_city', 'ship_region', 'ship_postal', 'ship_country', 'printer', 'printer_order_id', 'tracking', 'notes', 'ship_level', 'template', 'ornament', 'ornament_color', 'photo_style'];
+  'ship_name', 'ship_address', 'ship_city', 'ship_region', 'ship_postal', 'ship_country', 'printer', 'printer_order_id', 'tracking', 'notes', 'ship_level', 'template', 'ornament', 'ornament_color', 'photo_style', 'cover'];
 
 async function loadOrder(id) {
   const order = await one('SELECT * FROM orders WHERE id=$1', [id]);
@@ -27,6 +27,7 @@ async function loadOrder(id) {
   const shoots = await q('SELECT * FROM shoots WHERE order_id=$1 ORDER BY position, id', [id]);
   const photos = (await q('SELECT * FROM photos WHERE order_id=$1 ORDER BY shoot_id, position, id', [id]))
     .map(p => ({ ...p, low_res: isLowRes(p.width, p.height), too_small: isTooSmall(p.width, p.height) }));
+  order.cover = coverOf(order); // v1.26: always explicit (old orders: Prestige = hard, others = soft)
   const proofs = await q('SELECT id, version, status, interior_url, cover_url, preview_url, page_count, layout, sent_at, decided_at, created_at FROM proofs WHERE order_id=$1 ORDER BY version DESC', [id]);
   const comments = proofs.length ? await q('SELECT * FROM proof_comments WHERE proof_id = ANY($1::int[]) ORDER BY created_at', [proofs.map(p => p.id)]) : [];
   const events = await q('SELECT * FROM events WHERE order_id=$1 ORDER BY created_at DESC LIMIT 100', [id]);
@@ -64,7 +65,12 @@ export default async function handler(req, res) {
     const who = admin.name || admin.email;
 
     switch (action) {
-      case 'me': return res.json({ ok: true, admin, statuses: STATUSES, packages: PACKAGES, blob: hasBlob(), lulu: { configured: lulu.hasLulu(), env: lulu.luluEnv(), levels: lulu.SHIPPING_LEVELS }, stripe: { configured: hasStripe(), mode: stripeMode() }, templates: TEMPLATES, ornaments: ORNAMENTS, ornamentColors: ORNAMENT_COLORS });
+      case 'me': return res.json({ ok: true, admin, statuses: STATUSES, packages: PACKAGES, blob: hasBlob(), lulu: { configured: lulu.hasLulu(), env: lulu.luluEnv(), levels: lulu.SHIPPING_LEVELS }, stripe: { configured: hasStripe(), mode: stripeMode() }, templates: TEMPLATES, ornaments: ORNAMENTS, ornamentColors: ORNAMENT_COLORS,
+        covers: COVERS, hardSurcharge: HARD_SURCHARGE, hardExtraSurcharge: HARD_EXTRA_SURCHARGE, luluPromo: (await getSetting('lulu_promo')) || '' });
+      case 'settings-save': { // v1.26 — the current Lulu promo code (shown on every "Send to Lulu" panel as a reminder)
+        if ('lulu_promo' in body) { const v = clip(String(body.lulu_promo || '').trim(), 200); await setSetting('lulu_promo', v); return res.json({ ok: true, luluPromo: v }); }
+        return res.json({ ok: true });
+      }
       case 'dashboard': {
         const counts = await q('SELECT status, count(*)::int AS n FROM orders GROUP BY status');
         const unread = (await one(`SELECT count(*)::int AS n FROM messages WHERE status='new'`)).n;
@@ -73,10 +79,10 @@ export default async function handler(req, res) {
       }
       case 'orders': {
         const st = req.query.status;
-        const rows = await q(`SELECT o.id, o.ref, o.status, o.customer_name, o.customer_email, o.package, o.copies, o.price_usd, o.deposit_paid, o.balance_paid, o.ship_country, o.updated_at, o.created_at,
+        const rows = await q(`SELECT o.id, o.ref, o.status, o.customer_name, o.customer_email, o.package, o.cover, o.copies, o.price_usd, o.deposit_paid, o.balance_paid, o.ship_country, o.updated_at, o.created_at,
           (SELECT count(*)::int FROM photos p WHERE p.order_id=o.id) AS photo_count
           FROM orders o ${st && STATUS_KEYS.includes(st) ? 'WHERE o.status=$1' : ''} ORDER BY o.updated_at DESC LIMIT 500`, st && STATUS_KEYS.includes(st) ? [st] : []);
-        return res.json({ ok: true, orders: rows });
+        return res.json({ ok: true, orders: rows.map(r => ({ ...r, cover: coverOf(r) })) });
       }
       case 'order': {
         const d = await loadOrder(parseInt(req.query.id || body.id, 10));
@@ -104,16 +110,18 @@ export default async function handler(req, res) {
           if (k === 'ornament') v = ornamentKey(v);
           if (k === 'ornament_color') v = ornamentColor(v);
           if (k === 'photo_style') v = ['full', 'mix', 'gallery'].includes(v) ? v : 'full';
+          if (k === 'cover') { v = normCover(v); if (!v) return fail(res, 400, 'Cover must be soft or hard'); }
           if (typeof v === 'string') v = clip(v, 4000);
           vals.push(v); sets.push(`${k}=$${vals.length}`);
         }
-        if (body.recalcPrice) { vals.push(priceFor(body.package || cur.package, body.copies || cur.copies)); sets.push(`price_usd=$${vals.length}`); }
+        if (body.recalcPrice) { vals.push(priceFor(body.package || cur.package, body.copies || cur.copies, normCover(body.cover) || coverOf(cur))); sets.push(`price_usd=$${vals.length}`); }
         if (!sets.length) return res.json({ ok: true });
         vals.push(id);
         await q(`UPDATE orders SET ${sets.join(', ')}, updated_at=now() WHERE id=$${vals.length}`, vals);
         if (body.balance_paid === true && !cur.balance_paid && cur.status === 'approved' && !body.status) {
           await q(`UPDATE orders SET status='paid' WHERE id=$1`, [id]); await logEvent(id, who, 'Balance marked as paid — status: Approved & paid');
         }
+        if (normCover(body.cover) && normCover(body.cover) !== coverOf(cur)) await logEvent(id, who, `Cover changed: ${coverLabel(coverOf(cur))} → ${coverLabel(body.cover)}${body.recalcPrice ? ' (price recalculated)' : ''} — build a new proof: the cover size and the Lulu product change`);
         if (body.status && body.status !== cur.status) await logEvent(id, who, `Status: ${cur.status} → ${body.status}`);
         else if (body.template && Object.keys(body).length <= 2) await logEvent(id, who, `Book design: ${TEMPLATES[templateKey(body.template)].label}`);
         else await logEvent(id, who, 'Order details updated');
@@ -152,7 +160,7 @@ export default async function handler(req, res) {
         if (!m) return fail(res, 404, 'Message not found');
         if (m.order_id) return res.json({ ok: true, id: m.order_id });
         const key = Object.keys(PACKAGES).find(k => (m.package || '').toLowerCase().includes(PACKAGES[k].label.toLowerCase().slice(0, 5))) || 'signature';
-        const o = await createOrder({ customer_name: m.name, customer_email: m.email, lang: m.lang, package: key, copies: 1, notes: `From website message #${m.id}:\n${m.message || ''}` }, who);
+        const o = await createOrder({ customer_name: m.name, customer_email: m.email, lang: m.lang, package: key, cover: /hardcover/i.test(m.package || '') ? 'hard' : 'soft', copies: 1, notes: `From website message #${m.id}:\n${m.message || ''}` }, who);
         await q(`UPDATE messages SET order_id=$1, status='read' WHERE id=$2`, [o.id, m.id]);
         return res.json({ ok: true, id: o.id });
       }
@@ -234,13 +242,19 @@ export default async function handler(req, res) {
         if (!p) return fail(res, 400, 'The customer has not approved a proof yet. Only an approved proof can be printed.');
         const { address, problems } = lulu.addressFor(o);
         if (problems.length) return fail(res, 400, 'Shipping address incomplete: ' + problems.join(', '));
-        const pkg = PACKAGES[o.package] || PACKAGES.signature, cover = p.layout?.binding || pkg.cover;
+        // v1.26: print what the CUSTOMER CHOSE. The approved proof must have been built for that same cover
+        // (cover PDF size and minimum page count differ between softcover and hardcover).
+        const cover = coverOf(o), proofCover = (typeof p.layout === 'string' ? JSON.parse(p.layout) : p.layout)?.binding || cover;
+        if (proofCover !== cover) return fail(res, 400, `Cover mismatch: the customer chose ${coverLabel(cover).toUpperCase()} but approved proof v${p.version} was built for ${coverLabel(proofCover).toLowerCase()}. Build a new proof and have it approved again.`);
+        const pod = lulu.podFor(cover);
         const level = lulu.SHIPPING_LEVELS.includes(body.level) ? body.level : (o.ship_level || 'MAIL');
         let qt;
         try { qt = await lulu.quote({ cover, pages: p.page_count, quantity: o.copies || 1, address, level }); }
         catch (e) { return fail(res, 400, e.message); }
         const costTxt = `${qt.total.toFixed(2)} ${qt.currency} incl. tax (books ${qt.books.toFixed(2)} + shipping ${qt.shipping.toFixed(2)} + fee ${qt.fulfillment.toFixed(2)} + tax ${qt.tax.toFixed(2)}, ${level})`;
-        if (action === 'printer-quote') return res.json({ ok: true, quote: qt, level, text: costTxt, env: lulu.luluEnv() });
+        if (action === 'printer-quote') return res.json({ ok: true, quote: qt, level, text: costTxt, env: lulu.luluEnv(), cover, pod, luluPromo: (await getSetting('lulu_promo')) || '' });
+        // v1.26: before paying Lulu, the admin confirms they checked Lulu promotions (and notes the code used, if any)
+        if (!body.promoChecked) return fail(res, 400, 'Tick "I checked Lulu promotions" first (and note the promo code you will use, if any).');
         if (!o.balance_paid && !body.force) return fail(res, 400, `The balance isn't paid yet ($${balanceDue(o).toFixed(2)} USD). The customer pays it from their page after approving; for another payment method, tick "Balance paid" in the order details.`);
         if (o.printer_order_id && /^Lulu/.test(o.printer || '') && !['CANCELED', 'REJECTED', 'ERROR'].includes(o.printer_status) && !body.force)
           return fail(res, 400, `Already sent to Lulu (print job ${o.printer_order_id}, ${o.printer_status || 'status unknown'}).`);
@@ -252,11 +266,13 @@ export default async function handler(req, res) {
           interiorUrl: toAbs(pp.interior_url), coverUrl: toAbs(pp.cover_url), address, level }); }
         catch (e) { await logEvent(o.id, who, 'Lulu refused the print job: ' + e.message); return fail(res, 400, e.message); }
         const env = lulu.luluEnv();
+        const promo = clip(String(body.promo || '').trim(), 200) || null;
+        await q('UPDATE orders SET lulu_promo=$2, lulu_promo_checked_at=now() WHERE id=$1', [o.id, promo]);
         await q(`UPDATE orders SET printer=$1, printer_order_id=$2, printer_status=$3, printer_env=$4, printer_cost=$5, ship_level=$6, printer_sent_at=now(),
           status = CASE WHEN status IN ('approved','paid','proof_sent','layout','changes') THEN 'printing' ELSE status END, updated_at=now() WHERE id=$7`,
           [env === 'production' ? 'Lulu' : 'Lulu (sandbox)', String(job.id), job.status?.name || 'CREATED', env, costTxt, level, o.id]);
-        await logEvent(o.id, who, `Sent to Lulu${env === 'production' ? '' : ' SANDBOX (test, not printed)'}: print job ${job.id}, proof v${p.version}, ${o.copies || 1} cop${(o.copies || 1) > 1 ? 'ies' : 'y'}, ${level}. Quote ${costTxt}`);
-        return res.json({ ok: true, jobId: job.id, status: job.status?.name, env, text: costTxt });
+        await logEvent(o.id, who, `Sent to Lulu${env === 'production' ? '' : ' SANDBOX (test, not printed)'}: print job ${job.id}, ${coverLabel(cover).toUpperCase()} (${pod}), proof v${p.version}, ${o.copies || 1} cop${(o.copies || 1) > 1 ? 'ies' : 'y'}, ${level}. Quote ${costTxt}. Promo checked: ${promo || 'none available'}`);
+        return res.json({ ok: true, jobId: job.id, status: job.status?.name, env, text: costTxt, cover, pod, promo });
       }
       case 'printer-refresh': {
         const o = await one('SELECT * FROM orders WHERE id=$1', [parseInt(body.id, 10)]); if (!o) return fail(res, 404, 'Order not found');

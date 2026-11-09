@@ -167,7 +167,7 @@ function render() {
     <p class="muted">Your BOOKD in four steps. Everything saves as you go, so you can come back to this page any time with the same link.</p>
     ${PAID === 'deposit' ? `<div class="ok">Payment received — your book is reserved. We also emailed you this private link so you can come back any time.</div>` : ''}
     ${PAID === 'balance' ? `<div class="ok">Balance received — thank you! Your book goes to print now.</div>` : ''}
-    ${PAID === 'upgrade' ? `<div class="ok">Done — your book is now ${esc(D.order.packageLabel)}: up to ${D.order.maxPhotos} photos. The extra printing is added to your balance.</div>` : ''}
+    ${PAID === 'upgrade' ? `<div class="ok">Done — your book is now ${esc(D.order.packageLabel)} ${esc((D.order.coverLabel || '').toLowerCase())}: up to ${D.order.maxPhotos} photos. The difference is added to your balance.</div>` : ''}
     ${D.order.locked && PAID !== 'balance' ? (D.order.pay && D.order.pay.online && !D.order.pay.balance_paid && D.order.pay.due > 0 ? `<div class="ok">Your book is approved. Pay the balance in “Your proof” and we send it to print.</div>` : `<div class="ok">Your book is approved and in production. Thank you!</div>`) : ''}
     <nav class="steps">${names.map(([k, l], i) => `<a href="#${k}" data-step="${k}" class="${step === k ? 'on' : ''} ${done[k] ? 'done' : ''}"><b>0${i + 1}</b>${l}</a>`).join('')}</nav>
     <section id="pane"></section>`;
@@ -211,10 +211,16 @@ function nextPackage() {
 function quotaBox() {
   const n = D.photos.length, max = D.order.maxPhotos || 0, pct = Math.min(100, Math.round(n / Math.max(1, max) * 100)), up = nextPackage();
   const add = up?.upgrade ?? 0;
-  const upTxt = up && !D.order.locked ? ` Or move up to <b>${esc(up.label)}</b>: up to ${up.maxPhotos} photos, ${up.pages} pages${up.cover === 'hard' ? ', hardcover' : ''}, for only the extra printing: <b>+$${add} USD</b>, added to your balance (nothing to pay now).<div class="row" style="margin-top:8px"><button class="btn primary" type="button" id="upgrade" data-to="${esc(upKey())}" data-add="${add}">Upgrade to ${esc(up.label)} · +$${add} USD</button></div>` : '';
+  const upTxt = up && !D.order.locked ? ` Or move up to <b>${esc(up.label)}</b>: up to ${up.maxPhotos} photos, ${up.pages} pages, ${esc((D.order.coverLabel || '').toLowerCase())}, for the price difference: <b>+$${add} USD</b>, added to your balance (nothing to pay now).<div class="row" style="margin-top:8px"><button class="btn primary" type="button" id="upgrade" data-to="${esc(upKey())}" data-add="${add}">Upgrade to ${esc(up.label)} · +$${add} USD</button></div>` : '';
   if (n > max) return `<div class="quota over"><b>${n} photos — your ${esc(D.order.packageLabel)} package includes ${max}.</b><div class="bar"><i style="width:100%"></i></div><div class="small">Please remove ${n - max} photo${n - max > 1 ? 's' : ''} (press ✕ under a photo).${upTxt}</div></div>`;
   if (n === max) return `<div class="quota full"><b>${n} of ${max} photos: your package is full.</b><div class="bar"><i style="width:100%"></i></div><div class="small">To add another photo, remove one first.${upTxt}</div></div>`;
   return `<div class="quota ok"><div><b>${n} of ${max} photos</b> <span class="small muted">· ${esc(D.order.packageLabel)} package · ${max - n} more you can add</span></div><div class="bar"><i style="width:${pct}%"></i></div></div>`;
+}
+// v1.26 — the binding the customer chose, and the softcover → hardcover upgrade
+function bindingBox() {
+  const hard = D.order.cover === 'hard', add = D.order.hardUpgrade;
+  const up = !hard && add != null && !D.order.locked ? `<div class="row" style="margin-top:8px"><button class="btn" type="button" id="hardup" data-add="${add}">Upgrade to hardcover · +$${add} USD</button></div>` : '';
+  return `<div class="note"><b>Your book: ${esc(D.order.packageLabel)} · ${esc(D.order.coverLabel || '')}</b>${hard ? ' — thick boards, built to last.' : ` — light and affordable. Prefer thick boards that last for years? Switch to hardcover for <b>+$${add} USD</b>, added to your balance (nothing to pay now).`}${up}</div>`;
 }
 function coverBox() {
   const c = D.photos.find(p => p.role === 'cover'), first = D.photos[0];
@@ -241,6 +247,7 @@ function paneShoots() {
     <div class="row" style="justify-content:space-between"><h2>Shoots & photos</h2><span class="small muted">${kept} / ${D.order.maxPhotos} photos</span></div>
     <div class="note">Every photo prints full page. Original files and Instagram downloads print well. Only a photo too small to print well gets a <b>TOO SMALL</b> badge: ask the photographer for the original, or keep it anyway; you decide at the proof.</div>
     ${quotaBox()}
+    ${bindingBox()}
     <div class="guide"><b>How to build your book</b><ol>
       <li><b>One section per shoot</b> (or show, or event): press “+ Add a shoot”, fill in the credits and a few words about that day.</li>
       <li><b>Upload all the photos of that shoot at once</b>: select several files together. Use the original files (JPG or PNG), not screenshots.</li>
@@ -262,10 +269,15 @@ function paneShoots() {
     D.shoots.push({ id: r.id, kind: 'editorial', title: '', credits: CREDIT_DEFAULTS.map(l => ({ label: l, value: '' })), story: '' }); render();
   };
   const ub = $('#upgrade'); if (ub) ub.onclick = async () => {
-    const up = nextPackage(); if (!confirm(`Move up to ${up.label}: up to ${up.maxPhotos} photos and ${up.pages} pages.\n\n+$${ub.dataset.add} USD for the extra printing, added to your balance (paid after you approve your proof). Nothing to pay now.`)) return;
+    const up = nextPackage(); if (!confirm(`Move up to ${up.label}: up to ${up.maxPhotos} photos and ${up.pages} pages.\n\n+$${ub.dataset.add} USD for the price difference, added to your balance (paid after you approve your proof). Nothing to pay now.`)) return;
     ub.disabled = true;
     try { await api('upgrade', { to: ub.dataset.to }); location.replace(`${location.pathname}?t=${encodeURIComponent(T)}&paid=upgrade#shoots`); }
     catch (e) { toast(e.message); ub.disabled = false; } };
+  const hb = $('#hardup'); if (hb) hb.onclick = async () => {
+    if (!confirm(`Switch your book to HARDCOVER: thick boards, built to last.\n\n+$${hb.dataset.add} USD, added to your balance (paid after you approve your proof). Nothing to pay now.`)) return;
+    hb.disabled = true;
+    try { await api('upgrade', { cover: 'hard' }); location.replace(`${location.pathname}?t=${encodeURIComponent(T)}&paid=upgrade#shoots`); }
+    catch (e) { toast(e.message); hb.disabled = false; } };
   $('#submit').onclick = async () => { if (D.photos.length > (D.order.maxPhotos || 0)) { toast(`Please remove ${D.photos.length - D.order.maxPhotos} photo(s) first: your package includes ${D.order.maxPhotos}.`); $('.quota')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; } try { await api('submit', {}); toast('Sent — thank you!'); D.order.submitted_at = new Date().toISOString(); render(); } catch (e) { toast(e.message); } };
 }
 function shootCard(s) {

@@ -1,4 +1,4 @@
-# BOOKD — v1.25
+# BOOKD — v1.26
 
 Public site (5 languages) + performer portal + admin back office (English).
 
@@ -166,3 +166,12 @@ Test card: **4242 4242 4242 4242**, any future date, any CVC, any postal code. P
 - Use it through a private link: `https://<site>/?code=M3TEST`. A small "Private code applied: −90%" note appears; the link hides the code from the address bar.
 - The discount applies to the book and the shipping (deposit and balance). The admin order shows a "Private code −90%" pill; the timeline logs it; the performer's balance line shows the discount.
 - Customer page wording: after approving, says "Pay the balance … and we send it to print" until the balance is paid.
+
+## v1.26 — Softcover or hardcover, customer's choice + Lulu promo check
+- **Every package in softcover or hardcover.** Public site: a "Cover" toggle above the packages (and in the estimator) switches all prices; the choice is sent to Stripe and saved on the order (`orders.cover`).
+- **New prices (USD, before shipping):** Essentiel $129 / $149 · Signature $139 / $159 · Prestige $159 / $179 (soft / hard). Extra copy: $59 / $69 / $99 soft, +$20 hard. Hardcover = +$20 per copy (Lulu case wrap ≈ $9.60 more than perfect bound at every size, cost model v8). Same numbers in `lib/pricing.js` and `index.html` (PRICES).
+- **The order's cover drives everything:** proof layout (Lulu minimum 32 pages soft / 24 hard), cover PDF size (Lulu cover-dimensions) and the Lulu product (`0850X1100FCPREPB…` perfect bound / `0850X1100FCPRECW…` case wrap). Orders created before v1.26 keep their old binding (Prestige = hardcover).
+- **Admin:** SOFTCOVER / HARDCOVER badge in the order list and on the order sheet; "Cover" in Order details (change it + "Recalculate price"); the Lulu panel shows "Customer chose …" and checks the approved proof was built for that cover. If not, "Send to Lulu" is blocked: build a new proof and have it approved again.
+- **Performer portal:** shows "Your book: Signature · Softcover" with "Upgrade to hardcover · +$20" (added to the balance, like package upgrades). Upgrades = list-price difference.
+- **Lulu promo check before paying:** Lulu's Print API has no promo-code field — promotions are applied when you pay the print job in the Lulu dashboard. "Send to Lulu" now asks you to tick "I checked Lulu promotions" and note the code you will use; it is saved on the order and shown again next to "pay job …". Save the current promo once under **Team → Lulu promo code** (clear it when it expires).
+- Database: new columns `orders.cover`, `orders.lulu_promo`, `orders.lulu_promo_checked_at` and table `settings` — created automatically on first load. No new environment variables.

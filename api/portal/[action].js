@@ -3,7 +3,7 @@ import { q, one, ensureSchema, logEvent, hasDb } from '../../lib/db.js';
 import { readJson, readRaw, fail, clip, siteUrl, handle, isEmail } from '../../lib/http.js';
 import { sendMail, adminInbox } from '../../lib/mail.js';
 import { savePublic, removePublic, canClientUpload } from '../../lib/storage.js';
-import { PACKAGES, isLowRes, isTooSmall, upgradeSurcharge, shippingFor } from '../../lib/pricing.js';
+import { PACKAGES, isLowRes, isTooSmall, upgradeSurcharge, shippingFor, coverOf, coverLabel, normCover, listPrice, isUpgrade } from '../../lib/pricing.js';
 import { countryCode } from '../../lib/lulu.js';
 import { hasStripe as stripeOn } from '../../lib/stripe.js';
 import { KIND_LABELS } from '../../lib/layout.js';
@@ -42,9 +42,10 @@ export default async function handler(req, res) {
         .map(p => ({ ...p, low_res: isLowRes(p.width, p.height), too_small: isTooSmall(p.width, p.height) }));
       const proof = await one(`SELECT id, version, status, layout, interior_url, preview_url, page_count, sent_at, created_at FROM proofs WHERE order_id=$1 AND status IN ('sent','approved','changes') ORDER BY version DESC LIMIT 1`, [order.id]);
       const comments = proof ? await q('SELECT id, page, body, author, created_at FROM proof_comments WHERE proof_id=$1 ORDER BY created_at', [proof.id]) : [];
-      const pkg = PACKAGES[order.package] || PACKAGES.signature;
+      const pkg = PACKAGES[order.package] || PACKAGES.signature, cover = coverOf(order);
       return res.json({ ok: true, uploadMode: canClientUpload() ? 'blob' : 'direct', kinds: KIND_LABELS,
-        order: { ref: order.ref, status: order.status, locked, customer_name: order.customer_name, package: order.package, packageLabel: pkg.label, maxPhotos: pkg.maxPhotos, pages: pkg.pages, packages: Object.fromEntries(Object.entries(PACKAGES).map(([k, p]) => [k, { label: p.label, maxPhotos: p.maxPhotos, pages: p.pages, price: p.price, cover: p.cover, upgrade: p.maxPhotos > pkg.maxPhotos ? upgradeSurcharge(order.package, k, order.copies) : null }])), copies: order.copies,
+        order: { ref: order.ref, status: order.status, locked, customer_name: order.customer_name, package: order.package, packageLabel: pkg.label, cover, coverLabel: coverLabel(cover),
+          hardUpgrade: cover === 'soft' ? upgradeSurcharge(order.package, order.package, order.copies, 'soft', 'hard') : null, maxPhotos: pkg.maxPhotos, pages: pkg.pages, packages: Object.fromEntries(Object.entries(PACKAGES).map(([k, p]) => [k, { label: p.label, maxPhotos: p.maxPhotos, pages: p.pages, price: listPrice(k, cover), cover, upgrade: p.maxPhotos > pkg.maxPhotos ? upgradeSurcharge(order.package, k, order.copies, cover, cover) : null }])), copies: order.copies,
           content_at: order.content_at, profile: order.profile || {}, ship: Object.fromEntries(SHIP_KEYS.map(k => [k, order[k] || ''])), submitted_at: order.submitted_at,
           pay: { online: hasStripe(), price: order.price_usd == null ? null : +order.price_usd, shipping: order.shipping_usd == null ? null : +order.shipping_usd,
             paid: +(order.paid_usd || order.deposit_usd || 0), discount: +(order.discount_pct || 0), deposit_paid: !!order.deposit_paid, balance_paid: !!order.balance_paid, due: balanceDue(order) } },
@@ -140,13 +141,15 @@ export default async function handler(req, res) {
         await q(`UPDATE photos SET role=NULL WHERE order_id=$1 AND role='cover'`, [order.id]);
         await q(`UPDATE photos SET role='cover' WHERE id=$1`, [p.id]); return res.json({ ok: true });
       }
-      case 'upgrade': { // move up to a bigger package: no payment now, the extra printing is added to the balance
-        const cur = PACKAGES[order.package] || PACKAGES.signature, to = PACKAGES[body.to];
-        if (!to || to.maxPhotos <= cur.maxPhotos) return fail(res, 400, 'Please choose a bigger package');
-        const add = upgradeSurcharge(order.package, body.to, order.copies);
-        await q('UPDATE orders SET package=$1, price_usd=coalesce(price_usd,0)+$2, updated_at=now() WHERE id=$3', [body.to, add, order.id]);
-        await logEvent(order.id, 'customer', `Upgraded ${cur.label} → ${to.label}: +$${add} USD added to the balance (extra printing only)`);
-        await sendMail({ to: adminInbox(), subject: `[BOOKD] ${order.ref} — upgraded to ${to.label} (+$${add})`, text: `${order.customer_name} moved up to ${to.label}. +$${add} USD added to the balance.\n\n${siteUrl(req)}/admin/#order/${order.id}` });
+      case 'upgrade': { // move up to a bigger package and/or softcover → hardcover: no payment now, the list-price difference is added to the balance
+        const cur = PACKAGES[order.package] || PACKAGES.signature, toKey = PACKAGES[body.to] ? body.to : order.package, to = PACKAGES[toKey];
+        const fromCover = coverOf(order), toCover = normCover(body.cover) || fromCover;
+        if (!isUpgrade(order.package, toKey, fromCover, toCover)) return fail(res, 400, 'Please choose a bigger package or the hardcover');
+        const add = upgradeSurcharge(order.package, toKey, order.copies, fromCover, toCover);
+        await q('UPDATE orders SET package=$1, cover=$4, price_usd=coalesce(price_usd,0)+$2, updated_at=now() WHERE id=$3', [toKey, add, order.id, toCover]);
+        const what = `${cur.label} ${coverLabel(fromCover).toLowerCase()} → ${to.label} ${coverLabel(toCover).toLowerCase()}`;
+        await logEvent(order.id, 'customer', `Upgraded ${what}: +$${add} USD added to the balance`);
+        await sendMail({ to: adminInbox(), subject: `[BOOKD] ${order.ref} — upgraded: ${what} (+$${add})`, text: `${order.customer_name} upgraded: ${what}. +$${add} USD added to the balance.${toCover !== fromCover ? '\nCOVER CHANGED: build a new proof (cover size and Lulu product change).' : ''}\n\n${siteUrl(req)}/admin/#order/${order.id}` });
         return res.json({ ok: true, added: add });
       }
       case 'photo-move': {

@@ -1,11 +1,11 @@
 // api/checkout.js — Stripe Checkout: deposit from the public site (creates the order), balance from the performer portal.
 //   GET  /api/checkout?action=config                → { enabled, mode, depositPct }
-//   POST /api/checkout?action=deposit {package, copies, lang} → { url }
+//   POST /api/checkout?action=deposit {package, cover, copies, lang} → { url }
 //   POST /api/checkout?action=balance&t=TOKEN       → { url }
 //   GET  /api/checkout?action=return&session_id=…   → records the payment, redirects to the performer portal
 import { one, ensureSchema, hasDb } from '../lib/db.js';
 import { readJson, fail, siteUrl, handle } from '../lib/http.js';
-import { PACKAGES, priceFor, discountFor } from '../lib/pricing.js';
+import { PACKAGES, priceFor, discountFor, normCover, coverOf, coverLabel } from '../lib/pricing.js';
 import * as stripe from '../lib/stripe.js';
 import { recordPaidSession, balanceDue, portalLink } from '../lib/orders.js';
 export default async function handler(req, res) {
@@ -20,14 +20,15 @@ export default async function handler(req, res) {
       const b = await readJson(req);
       const pkg = PACKAGES[b.package] ? b.package : null; if (!pkg) return fail(res, 400, 'Unknown package');
       const copies = Math.max(1, Math.min(50, parseInt(b.copies, 10) || 1)), lang = ['fr', 'en', 'es', 'pt', 'it'].includes(b.lang) ? b.lang : 'en';
+      const cover = normCover(b.cover) || 'soft';
       const disc = discountFor(b.code); // secret code: silently ignored when unknown
-      const total = priceFor(pkg, copies), net = disc ? total * (100 - disc.pct) / 100 : total;
+      const total = priceFor(pkg, copies, cover), net = disc ? total * (100 - disc.pct) / 100 : total;
       const deposit = Math.max(0.5, Math.round(net * stripe.depositPct()) / 100);
       const s = await stripe.createSession({ amountUsd: deposit, lang, collectPhone: true,
-        name: `BOOKD ${PACKAGES[pkg].label} — deposit (${stripe.depositPct()}%)`,
-        description: `${PACKAGES[pkg].pages} pages, ${PACKAGES[pkg].cover === 'hard' ? 'hardcover' : 'softcover'}, ${copies} cop${copies > 1 ? 'ies' : 'y'} · book total $${total} USD${disc ? ` − ${disc.pct}% private discount` : ''} + shipping. Balance due after you approve your proof.`,
+        name: `BOOKD ${PACKAGES[pkg].label} ${coverLabel(cover)} — deposit (${stripe.depositPct()}%)`,
+        description: `${PACKAGES[pkg].pages} pages, ${coverLabel(cover).toLowerCase()}, ${copies} cop${copies > 1 ? 'ies' : 'y'} · book total $${total} USD${disc ? ` − ${disc.pct}% private discount` : ''} + shipping. Balance due after you approve your proof.`,
         successUrl: `${site}/api/checkout?action=return&session_id={CHECKOUT_SESSION_ID}`, cancelUrl: `${site}/?lang=${lang}#packages`,
-        metadata: { kind: 'deposit', package: pkg, copies: String(copies), lang, ...(disc ? { discount_code: disc.code, discount_pct: String(disc.pct) } : {}) } });
+        metadata: { kind: 'deposit', package: pkg, cover, copies: String(copies), lang, ...(disc ? { discount_code: disc.code, discount_pct: String(disc.pct) } : {}) } });
       return res.json({ ok: true, url: s.url });
     }
     if (action === 'balance' && req.method === 'POST') {
@@ -37,7 +38,7 @@ export default async function handler(req, res) {
       if (o.shipping_usd == null) return fail(res, 400, 'We are confirming your shipping cost; you will receive the final amount shortly.');
       const due = balanceDue(o); if (due <= 0) return fail(res, 400, 'Nothing left to pay. Thank you!');
       const s = await stripe.createSession({ amountUsd: due, lang: o.lang, email: o.customer_email,
-        name: `BOOKD ${PACKAGES[o.package]?.label || ''} — balance (${o.ref})`, description: `Book $${Number(o.price_usd).toFixed(2)} + shipping $${Number(o.shipping_usd).toFixed(2)}${o.discount_pct ? ` − ${o.discount_pct}% private discount` : ''} − paid $${Number(o.paid_usd || o.deposit_usd || 0).toFixed(2)}`,
+        name: `BOOKD ${PACKAGES[o.package]?.label || ''} ${coverLabel(coverOf(o))} — balance (${o.ref})`, description: `Book $${Number(o.price_usd).toFixed(2)} + shipping $${Number(o.shipping_usd).toFixed(2)}${o.discount_pct ? ` − ${o.discount_pct}% private discount` : ''} − paid $${Number(o.paid_usd || o.deposit_usd || 0).toFixed(2)}`,
         successUrl: `${site}/api/checkout?action=return&session_id={CHECKOUT_SESSION_ID}`, cancelUrl: `${portalLink(site, o)}#proof`,
         metadata: { kind: 'balance', order_id: String(o.id), ref: o.ref } });
       return res.json({ ok: true, url: s.url });

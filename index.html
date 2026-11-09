@@ -284,7 +284,14 @@ section{padding-block:80px}
 .pkg .price .plus{font-family:var(--mono);font-size:.74rem;color:var(--muted)}
 .estimate{margin-top:28px;background:var(--surface);border:1px solid var(--rule);border-radius:4px;padding:24px;max-width:640px}
 .estimate h3{font-size:1.5rem}
-.est-row{display:grid;grid-template-columns:1.3fr 1.3fr .6fr;gap:14px;margin-top:16px}
+.est-row{display:grid;grid-template-columns:1.2fr 1fr 1.2fr .6fr;gap:14px;margin-top:16px}
+.cv-pick{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 18px}
+.cv-pick .cv-t{font-size:.8rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-right:6px}
+.cv-pick label{position:relative;cursor:pointer}
+.cv-pick input{position:absolute;opacity:0;pointer-events:none}
+.cv-pick label>span{display:inline-block;padding:9px 16px;border:1.5px solid var(--ink);border-radius:999px;font-size:.92rem}
+.cv-pick input:checked+span{background:var(--ink);color:var(--bg,#fff)}
+.cv-pick input:focus-visible+span{outline:2px solid var(--accent,#FF5A7E);outline-offset:2px}
 .est-lines{display:grid;grid-template-columns:1fr auto;gap:8px 0;margin:20px 0 0;font-variant-numeric:tabular-nums}
 .est-lines dd{margin:0;text-align:right;padding-left:16px}
 .est-lines .tot{border-top:1px solid var(--ink);padding-top:10px;font-weight:600;font-size:1.1rem}
@@ -464,23 +471,28 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
         <div><div class="eyebrow" data-i18n="pk_eyebrow"></div><h2 style="margin-top:12px" data-i18n="pk_title"></h2></div>
         <p data-i18n="pk_lede"></p>
       </div>
+      <div class="cv-pick" role="radiogroup" aria-labelledby="cv-title">
+        <span id="cv-title" class="cv-t" data-i18n="cv_title"></span>
+        <label><input type="radio" name="cv" value="soft" checked><span data-i18n="cv_soft"></span></label>
+        <label><input type="radio" name="cv" value="hard"><span><span data-i18n="cv_hard"></span> <small>+$20</small></span></label>
+      </div>
       <div class="pkgs">
         <div class="pkg">
           <h3 data-i18n="p1_name"></h3>
-          <ul><li data-i18n="p1_a"></li><li data-i18n="p1_b"></li><li data-i18n="p1_c"></li><li data-i18n="p_ship"></li></ul>
+          <ul><li class="cv-lbl"></li><li data-i18n="p1_b"></li><li data-i18n="p1_c"></li><li data-i18n="p_ship"></li></ul>
           <div class="price"><span class="amt" data-price="essentiel"></span><span class="plus" data-i18n="p_plus"></span><span class="extra"><span data-i18n="p_extra"></span><b data-extra="essentiel"></b></span></div>
           <button type="button" class="btn" data-pkg="essentiel" data-i18n="p_reserve"></button>
         </div>
         <div class="pkg feat">
           <span class="badge" data-i18n="p2_badge"></span>
           <h3 data-i18n="p2_name"></h3>
-          <ul><li data-i18n="p2_a"></li><li data-i18n="p2_b"></li><li data-i18n="p2_c"></li><li data-i18n="p_ship"></li></ul>
+          <ul><li class="cv-lbl"></li><li data-i18n="p2_b"></li><li data-i18n="p2_c"></li><li data-i18n="p_ship"></li></ul>
           <div class="price"><span class="amt" data-price="signature"></span><span class="plus" data-i18n="p_plus"></span><span class="extra"><span data-i18n="p_extra"></span><b data-extra="signature"></b></span></div>
           <button type="button" class="btn primary" data-pkg="signature" data-i18n="p_reserve"></button>
         </div>
         <div class="pkg">
           <h3 data-i18n="p3_name"></h3>
-          <ul><li data-i18n="p3_a"></li><li data-i18n="p3_b"></li><li data-i18n="p3_c"></li><li data-i18n="p_ship"></li></ul>
+          <ul><li class="cv-lbl"></li><li data-i18n="p3_b"></li><li data-i18n="p3_c"></li><li data-i18n="p_ship"></li></ul>
           <div class="price"><span class="amt" data-price="prestige"></span><span class="plus" data-i18n="p_plus"></span><span class="extra"><span data-i18n="p_extra"></span><b data-extra="prestige"></b></span></div>
           <button type="button" class="btn" data-pkg="prestige" data-i18n="p_reserve"></button>
         </div>
@@ -491,6 +503,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
         <h3 data-i18n="est_title"></h3>
         <div class="est-row">
           <div class="f"><label for="est-pkg" data-i18n="est_pkg"></label><select id="est-pkg"></select></div>
+          <div class="f"><label for="est-cover" data-i18n="cv_title"></label><select id="est-cover"></select></div>
           <div class="f"><label for="est-region" data-i18n="est_region"></label><select id="est-region"></select></div>
           <div class="f"><label for="est-qty" data-i18n="est_qty"></label><input id="est-qty" type="number" min="1" max="50" value="1" inputmode="numeric"></div>
         </div>
@@ -564,13 +577,13 @@ const CONTACT_EMAIL = "sgauthier@executiveproducer.ca";
 const T = {
 fr:{
 p_extra:"Exemplaire supplémentaire : ",est_qty:"Exemplaires",est_extra:"Exemplaires supplémentaires",vol_note:"<b>Rabais de volume.</b> Dès le 2<sup>e</sup> exemplaire du même book, vous ne payez que l'impression : la conception est déjà faite.",p_plus:"+ livraison selon le pays",est_title:"Estimez votre total",est_pkg:"Formule",est_region:"Livraison vers",est_book:"Book",est_ship:"Livraison estimée",est_total:"Total estimé",est_note:"Estimation en dollars américains. Le coût exact de livraison est confirmé avant le paiement. Les droits de douane et taxes locales ne sont pas inclus.",regions:["États-Unis","Canada","Royaume-Uni","Union européenne","Australie / Nouvelle-Zélande","Amérique latine","Asie","Moyen-Orient / Afrique"],pr_eyebrow:"Le produit",pr_title:"Votre book, en vrai.",pr_lede:"Un livre que l'on tient, que l'on feuillette et que l'on laisse sur la table du directeur de casting. Imprimé sur papier couché premium, relié comme un livre d'art.",
-pr_s1_t:"Format",pr_s1:"8,5 × 11 po à la verticale, le format classique du book en agence",pr_s2_t:"Couverture",pr_s2:"Souple pour Essentiel et Signature, rigide pour Prestige",pr_s3_t:"Impression",pr_s3:"Papier couché premium, couleurs fidèles, couverture imprimée de bord à bord",
-pr_hard_t:"Couverture rigide",pr_hard:"Formule Prestige · carton épais, se garde des années",pr_soft_t:"Couverture souple",pr_soft:"Formules Essentiel et Signature · léger, prix accessible",nav_sample:"Exemple",nav_how:"Comment ça marche",nav_packages:"Formules",nav_faq:"FAQ",nav_contact:"Nous écrire",
+pr_s1_t:"Format",pr_s1:"8,5 × 11 po à la verticale, le format classique du book en agence",pr_s2_t:"Couverture",pr_s2:"Souple ou rigide, au choix, pour toutes les formules",pr_s3_t:"Impression",pr_s3:"Papier couché premium, couleurs fidèles, couverture imprimée de bord à bord",
+pr_hard_t:"Couverture rigide",pr_hard:"Toutes les formules · carton épais, se garde des années · +20 $ US",pr_soft_t:"Couverture souple",pr_soft:"Toutes les formules · légère, prix accessible",nav_sample:"Exemple",nav_how:"Comment ça marche",nav_packages:"Formules",nav_faq:"FAQ",nav_contact:"Nous écrire",
 hero_eyebrow:"Portfolio imprimé · pour artistes de la scène et de l'image",
 hero_title:"Le book qui vous fait <em>booker.</em>",
 hero_lede:"Vos plus belles séances, réunies dans un vrai livre. Chaque séance s'ouvre sur ses crédits et son histoire, puis vos photos parlent. Vous le posez sur la table en audition, en agence ou en rendez-vous client.",
 cta_reserve:"Réserver mon book",cta_sample:"Feuilleter l'exemple",
-spec1:"8,5 × 11 po · portrait",spec2:"Souple ou rigide",spec3:"Livraison partout dans le monde",
+spec1:"8,5 × 11 po · portrait",spec2:"Souple ou rigide, au choix",cv_title:"Couverture",cv_soft:"Couverture souple",cv_hard:"Couverture rigide",cv_note:"Couverture rigide : +20 $ US par exemplaire",spec3:"Livraison partout dans le monde",
 hero_cap:"COUVERTURE · EXEMPLE FICTIF · IA",
 sample_eyebrow:"Le livre",sample_title:"Trois books, trois parcours.",
 sample_lede:"Chaque section commence par une page de crédits : photographe, maquillage, coiffure, stylisme, lieu, date, et ce que vous avez vécu ce jour-là. Ensuite, seulement les photos de cette séance.",
@@ -585,7 +598,7 @@ s2_t:"Envoyez vos photos",s2_p:"En pleine résolution, avec les crédits et quel
 s3_t:"Approuvez l'épreuve",s3_p:"Vous feuilletez votre livre en ligne, commentez une page, demandez des changements. Rien ne part à l'impression sans votre accord.",
 s4_t:"Recevez votre book",s4_p:"Imprimé sur papier couché premium et livré à votre adresse, où que vous soyez.",
 pk_eyebrow:"Formules",pk_title:"Choisissez l'épaisseur de votre carrière.",
-pk_lede:"Trois formats, le même soin. La couverture souple garde le prix accessible; la rigide est faite pour durer.",
+pk_lede:"Trois formats, le même soin. Choisissez la couverture souple pour un prix accessible, ou rigide pour un book qui dure.",
 p1_name:"Essentiel",p1_a:"Couverture souple",p1_b:"32 pages",p1_c:"Jusqu'à 18 photos",
 p2_badge:"Le plus choisi",p2_name:"Signature",p2_a:"Couverture souple",p2_b:"40 pages",p2_c:"Jusqu'à 32 photos",
 p3_name:"Prestige",p3_a:"Couverture rigide",p3_b:"60 pages",p3_c:"Jusqu'à 50 photos",
@@ -626,13 +639,13 @@ cap_framed:"En coulisses, juste avant la sortie.",bk_contact:"Booking et représ
 },
 en:{
 p_extra:"Extra copy: ",est_qty:"Copies",est_extra:"Extra copies",vol_note:"<b>Volume discount.</b> From the 2nd copy of the same book, you only pay for printing: the design is already done.",p_plus:"+ shipping by country",est_title:"Estimate your total",est_pkg:"Package",est_region:"Ship to",est_book:"Book",est_ship:"Estimated shipping",est_total:"Estimated total",est_note:"Estimate in US dollars. The exact shipping cost is confirmed before you pay. Customs duties and local taxes are not included.",regions:["United States","Canada","United Kingdom","European Union","Australia / New Zealand","Latin America","Asia","Middle East / Africa"],pr_eyebrow:"The product",pr_title:"Your book, for real.",pr_lede:"A book you hold, flip through and leave on the casting director's table. Printed on premium coated paper and bound like an art book.",
-pr_s1_t:"Size",pr_s1:"8.5 × 11 in portrait, the classic agency book format",pr_s2_t:"Cover",pr_s2:"Softcover for Essential and Signature, hardcover for Prestige",pr_s3_t:"Printing",pr_s3:"Premium coated paper, true colours, cover printed edge to edge",
-pr_hard_t:"Hardcover",pr_hard:"Prestige package · thick boards, built to last for years",pr_soft_t:"Softcover",pr_soft:"Essential and Signature packages · light, accessible price",nav_sample:"Sample",nav_how:"How it works",nav_packages:"Packages",nav_faq:"FAQ",nav_contact:"Contact",
+pr_s1_t:"Size",pr_s1:"8.5 × 11 in portrait, the classic agency book format",pr_s2_t:"Cover",pr_s2:"Softcover or hardcover, your choice, on every package",pr_s3_t:"Printing",pr_s3:"Premium coated paper, true colours, cover printed edge to edge",
+pr_hard_t:"Hardcover",pr_hard:"Any package · thick boards, built to last for years · +$20",pr_soft_t:"Softcover",pr_soft:"Any package · light, accessible price",nav_sample:"Sample",nav_how:"How it works",nav_packages:"Packages",nav_faq:"FAQ",nav_contact:"Contact",
 hero_eyebrow:"Printed portfolio · for stage and screen talent",
 hero_title:"The book that gets you <em>booked.</em>",
 hero_lede:"Your best shoots, in a real printed book. Each shoot opens with its credits and its story, then your photos do the talking. Put it on the table at castings, agencies and client meetings.",
 cta_reserve:"Reserve my book",cta_sample:"Flip through the sample",
-spec1:"8.5 × 11 in · portrait",spec2:"Softcover or hardcover",spec3:"Shipped worldwide",
+spec1:"8.5 × 11 in · portrait",spec2:"Softcover or hardcover, your choice",cv_title:"Cover",cv_soft:"Softcover",cv_hard:"Hardcover",cv_note:"Hardcover: +$20 USD per copy",spec3:"Shipped worldwide",
 hero_cap:"COVER · FICTIONAL SAMPLE · AI",
 sample_eyebrow:"The book",sample_title:"Three books, three careers.",
 sample_lede:"Every section opens with a credit page: photographer, makeup, hair, styling, location, date, and what that day was like for you. Then only the photos from that shoot.",
@@ -647,7 +660,7 @@ s2_t:"Send your photos",s2_p:"In full resolution, with the credits and a few wor
 s3_t:"Approve the proof",s3_p:"Flip through your book online, comment on any page, ask for changes. Nothing is printed without your approval.",
 s4_t:"Get your book",s4_p:"Printed on premium coated paper and shipped to your address, wherever you are.",
 pk_eyebrow:"Packages",pk_title:"Choose how much of your career to show.",
-pk_lede:"Three formats, the same care. Softcover keeps the price accessible; hardcover is built to last.",
+pk_lede:"Three formats, the same care. Pick softcover for an accessible price, or hardcover for a book built to last.",
 p1_name:"Essential",p1_a:"Softcover",p1_b:"32 pages",p1_c:"Up to 18 photos",
 p2_badge:"Most chosen",p2_name:"Signature",p2_a:"Softcover",p2_b:"40 pages",p2_c:"Up to 32 photos",
 p3_name:"Prestige",p3_a:"Hardcover",p3_b:"60 pages",p3_c:"Up to 50 photos",
@@ -688,14 +701,14 @@ cap_framed:"Backstage, just before the walk.",bk_contact:"Booking and representa
 },
 es:{
 p_extra:"Ejemplar adicional: ",est_qty:"Ejemplares",est_extra:"Ejemplares adicionales",vol_note:"<b>Descuento por volumen.</b> Desde el 2.º ejemplar del mismo book solo pagas la impresión: el diseño ya está hecho.",p_plus:"+ envío según el país",est_title:"Calcula tu total",est_pkg:"Paquete",est_region:"Envío a",est_book:"Book",est_ship:"Envío estimado",est_total:"Total estimado",est_note:"Estimación en dólares estadounidenses. El costo exacto del envío se confirma antes del pago. No incluye aranceles ni impuestos locales.",regions:["Estados Unidos","Canadá","Reino Unido","Unión Europea","Australia / Nueva Zelanda","América Latina","Asia","Oriente Medio / África"],pr_eyebrow:"El producto",pr_title:"Tu book, de verdad.",pr_lede:"Un libro que se toma en las manos, se hojea y se deja sobre la mesa del director de casting. Impreso en papel estucado premium y encuadernado como un libro de arte.",
-pr_s1_t:"Formato",pr_s1:"8,5 × 11 pulgadas vertical, el formato clásico del book de agencia",pr_s2_t:"Tapa",pr_s2:"Blanda para Esencial y Signature, dura para Prestige",pr_s3_t:"Impresión",pr_s3:"Papel estucado premium, colores fieles, portada impresa a sangre",
-pr_hard_t:"Tapa dura",pr_hard:"Paquete Prestige · cartón grueso, hecho para durar años",pr_soft_t:"Tapa blanda",pr_soft:"Paquetes Esencial y Signature · ligero, precio accesible",
+pr_s1_t:"Formato",pr_s1:"8,5 × 11 pulgadas vertical, el formato clásico del book de agencia",pr_s2_t:"Tapa",pr_s2:"Tapa blanda o dura a elegir, en todos los paquetes",pr_s3_t:"Impresión",pr_s3:"Papel estucado premium, colores fieles, portada impresa a sangre",
+pr_hard_t:"Tapa dura",pr_hard:"Cualquier paquete · cartón grueso, hecho para durar años · +20 USD",pr_soft_t:"Tapa blanda",pr_soft:"Cualquier paquete · ligero, precio accesible",
 nav_sample:"Ejemplo",nav_how:"Cómo funciona",nav_packages:"Paquetes",nav_faq:"Preguntas",nav_contact:"Contacto",
 hero_eyebrow:"Portafolio impreso · para artistas de escena y pantalla",
 hero_title:"El book que te hace <em>conseguir trabajo.</em>",
 hero_lede:"Tus mejores sesiones, reunidas en un libro de verdad. Cada sesión empieza con sus créditos y su historia, y luego hablan tus fotos. Ponlo sobre la mesa en castings, agencias y reuniones con clientes.",
 cta_reserve:"Reservar mi book",cta_sample:"Hojear el ejemplo",
-spec1:"8,5 × 11 pulg. · vertical",spec2:"Tapa blanda o dura",spec3:"Envío a todo el mundo",
+spec1:"8,5 × 11 pulg. · vertical",spec2:"Tapa blanda o dura, a elegir",cv_title:"Tapa",cv_soft:"Tapa blanda",cv_hard:"Tapa dura",cv_note:"Tapa dura: +20 USD por ejemplar",spec3:"Envío a todo el mundo",
 hero_cap:"PORTADA · EJEMPLO FICTICIO · IA",
 sample_eyebrow:"El libro",sample_title:"Tres books, tres carreras.",
 sample_lede:"Cada sección empieza con una página de créditos: fotógrafo, maquillaje, peinado, estilismo, lugar, fecha y cómo viviste ese día. Después, solo las fotos de esa sesión.",
@@ -710,7 +723,7 @@ s2_t:"Envía tus fotos",s2_p:"En alta resolución, con los créditos y unas pala
 s3_t:"Aprueba la prueba",s3_p:"Hojeas tu libro en línea, comentas cualquier página y pides cambios. Nada se imprime sin tu aprobación.",
 s4_t:"Recibe tu book",s4_p:"Impreso en papel estucado premium y enviado a tu dirección, donde estés.",
 pk_eyebrow:"Paquetes",pk_title:"Elige cuánto de tu carrera mostrar.",
-pk_lede:"Tres formatos, el mismo cuidado. La tapa blanda mantiene un precio accesible; la tapa dura está hecha para durar.",
+pk_lede:"Tres formatos, el mismo cuidado. Elige tapa blanda para un precio accesible, o tapa dura para un libro que dure.",
 p1_name:"Esencial",p1_a:"Tapa blanda",p1_b:"32 páginas",p1_c:"Hasta 18 fotos",
 p2_badge:"El más elegido",p2_name:"Signature",p2_a:"Tapa blanda",p2_b:"40 páginas",p2_c:"Hasta 32 fotos",
 p3_name:"Prestige",p3_a:"Tapa dura",p3_b:"60 páginas",p3_c:"Hasta 50 fotos",
@@ -737,14 +750,14 @@ m_type:"Tipo",m_name:"Nombre",m_email:"Correo",m_disc:"Disciplina",m_pkg:"Paquet
 ft_tag:"Portafolios impresos para artistas · Montreal, envío a todo el mundo",ft_spec:"8,5 × 11 pulg. · 300 ppp · papel estucado premium"},
 pt:{
 p_extra:"Exemplar adicional: ",est_qty:"Exemplares",est_extra:"Exemplares adicionais",vol_note:"<b>Desconto por volume.</b> A partir do 2º exemplar do mesmo book, você paga só a impressão: a diagramação já está feita.",p_plus:"+ frete conforme o país",est_title:"Calcule seu total",est_pkg:"Pacote",est_region:"Entregar em",est_book:"Book",est_ship:"Frete estimado",est_total:"Total estimado",est_note:"Estimativa em dólares americanos. O valor exato do frete é confirmado antes do pagamento. Impostos de importação e taxas locais não estão incluídos.",regions:["Estados Unidos","Canadá","Reino Unido","União Europeia","Austrália / Nova Zelândia","América Latina","Ásia","Oriente Médio / África"],pr_eyebrow:"O produto",pr_title:"Seu book, de verdade.",pr_lede:"Um livro que se segura, se folheia e se deixa na mesa do diretor de elenco. Impresso em papel couché premium e encadernado como um livro de arte.",
-pr_s1_t:"Formato",pr_s1:"8,5 × 11 polegadas vertical, o formato clássico do book de agência",pr_s2_t:"Capa",pr_s2:"Flexível para Essencial e Signature, dura para Prestige",pr_s3_t:"Impressão",pr_s3:"Papel couché premium, cores fiéis, capa impressa de ponta a ponta",
-pr_hard_t:"Capa dura",pr_hard:"Pacote Prestige · cartão grosso, feito para durar anos",pr_soft_t:"Capa flexível",pr_soft:"Pacotes Essencial e Signature · leve, preço acessível",
+pr_s1_t:"Formato",pr_s1:"8,5 × 11 polegadas vertical, o formato clássico do book de agência",pr_s2_t:"Capa",pr_s2:"Capa flexível ou dura à sua escolha, em todos os pacotes",pr_s3_t:"Impressão",pr_s3:"Papel couché premium, cores fiéis, capa impressa de ponta a ponta",
+pr_hard_t:"Capa dura",pr_hard:"Qualquer pacote · cartão grosso, feito para durar anos · +20 USD",pr_soft_t:"Capa flexível",pr_soft:"Qualquer pacote · leve, preço acessível",
 nav_sample:"Exemplo",nav_how:"Como funciona",nav_packages:"Pacotes",nav_faq:"Perguntas",nav_contact:"Contato",
 hero_eyebrow:"Portfólio impresso · para artistas de palco e tela",
 hero_title:"O book que faz você ser <em>contratado.</em>",
 hero_lede:"Seus melhores ensaios, reunidos em um livro de verdade. Cada ensaio começa com seus créditos e sua história, e depois suas fotos falam. Coloque-o na mesa em testes, agências e reuniões com clientes.",
 cta_reserve:"Reservar meu book",cta_sample:"Folhear o exemplo",
-spec1:"8,5 × 11 pol. · vertical",spec2:"Capa flexível ou dura",spec3:"Entrega no mundo todo",
+spec1:"8,5 × 11 pol. · vertical",spec2:"Capa flexível ou dura, à sua escolha",cv_title:"Capa",cv_soft:"Capa flexível",cv_hard:"Capa dura",cv_note:"Capa dura: +20 USD por exemplar",spec3:"Entrega no mundo todo",
 hero_cap:"CAPA · EXEMPLO FICTÍCIO · IA",
 sample_eyebrow:"O livro",sample_title:"Três books, três carreiras.",
 sample_lede:"Cada seção começa com uma página de créditos: fotógrafo, maquiagem, cabelo, styling, local, data e como foi aquele dia para você. Depois, só as fotos daquele ensaio.",
@@ -759,7 +772,7 @@ s2_t:"Envie suas fotos",s2_p:"Em alta resolução, com os créditos e algumas pa
 s3_t:"Aprove a prova",s3_p:"Você folheia seu livro online, comenta qualquer página e pede alterações. Nada é impresso sem a sua aprovação.",
 s4_t:"Receba seu book",s4_p:"Impresso em papel couché premium e enviado para o seu endereço, onde você estiver.",
 pk_eyebrow:"Pacotes",pk_title:"Escolha quanto da sua carreira mostrar.",
-pk_lede:"Três formatos, o mesmo cuidado. A capa flexível mantém o preço acessível; a capa dura é feita para durar.",
+pk_lede:"Três formatos, o mesmo cuidado. Escolha capa flexível para um preço acessível, ou capa dura para um livro que dura.",
 p1_name:"Essencial",p1_a:"Capa flexível",p1_b:"32 páginas",p1_c:"Até 18 fotos",
 p2_badge:"O mais escolhido",p2_name:"Signature",p2_a:"Capa flexível",p2_b:"40 páginas",p2_c:"Até 32 fotos",
 p3_name:"Prestige",p3_a:"Capa dura",p3_b:"60 páginas",p3_c:"Até 50 fotos",
@@ -786,14 +799,14 @@ m_type:"Tipo",m_name:"Nome",m_email:"E-mail",m_disc:"Área",m_pkg:"Pacote",m_msg
 ft_tag:"Portfólios impressos para artistas · Montreal, entrega no mundo todo",ft_spec:"8,5 × 11 pol. · 300 dpi · papel couché premium"},
 it:{
 p_extra:"Copia aggiuntiva: ",est_qty:"Copie",est_extra:"Copie aggiuntive",vol_note:"<b>Sconto quantità.</b> Dalla 2ª copia dello stesso book paghi solo la stampa: l'impaginazione è già fatta.",p_plus:"+ spedizione in base al paese",est_title:"Stima il tuo totale",est_pkg:"Pacchetto",est_region:"Spedizione verso",est_book:"Book",est_ship:"Spedizione stimata",est_total:"Totale stimato",est_note:"Stima in dollari USA. Il costo esatto della spedizione è confermato prima del pagamento. Dazi doganali e tasse locali non inclusi.",regions:["Stati Uniti","Canada","Regno Unito","Unione Europea","Australia / Nuova Zelanda","America Latina","Asia","Medio Oriente / Africa"],pr_eyebrow:"Il prodotto",pr_title:"Il tuo book, dal vero.",pr_lede:"Un libro da tenere in mano, da sfogliare e da lasciare sul tavolo del direttore del casting. Stampato su carta patinata premium e rilegato come un libro d'arte.",
-pr_s1_t:"Formato",pr_s1:"8,5 × 11 pollici verticale, il formato classico del book d'agenzia",pr_s2_t:"Copertina",pr_s2:"Morbida per Essenziale e Signature, rigida per Prestige",pr_s3_t:"Stampa",pr_s3:"Carta patinata premium, colori fedeli, copertina stampata al vivo",
-pr_hard_t:"Copertina rigida",pr_hard:"Pacchetto Prestige · cartone spesso, fatto per durare anni",pr_soft_t:"Copertina morbida",pr_soft:"Pacchetti Essenziale e Signature · leggero, prezzo accessibile",
+pr_s1_t:"Formato",pr_s1:"8,5 × 11 pollici verticale, il formato classico del book d'agenzia",pr_s2_t:"Copertina",pr_s2:"Morbida o rigida a scelta, per ogni pacchetto",pr_s3_t:"Stampa",pr_s3:"Carta patinata premium, colori fedeli, copertina stampata al vivo",
+pr_hard_t:"Copertina rigida",pr_hard:"Ogni pacchetto · cartone spesso, fatto per durare anni · +20 USD",pr_soft_t:"Copertina morbida",pr_soft:"Ogni pacchetto · leggera, prezzo accessibile",
 nav_sample:"Esempio",nav_how:"Come funziona",nav_packages:"Pacchetti",nav_faq:"Domande",nav_contact:"Contatti",
 hero_eyebrow:"Portfolio stampato · per artisti di palco e schermo",
 hero_title:"Il book che ti fa <em>lavorare.</em>",
 hero_lede:"I tuoi servizi migliori, riuniti in un vero libro. Ogni servizio si apre con i suoi crediti e la sua storia, poi parlano le tue foto. Mettilo sul tavolo ai casting, in agenzia e agli incontri con i clienti.",
 cta_reserve:"Prenota il mio book",cta_sample:"Sfoglia l'esempio",
-spec1:"8,5 × 11 poll. · verticale",spec2:"Copertina morbida o rigida",spec3:"Spedizione in tutto il mondo",
+spec1:"8,5 × 11 poll. · verticale",spec2:"Copertina morbida o rigida, a scelta",cv_title:"Copertina",cv_soft:"Copertina morbida",cv_hard:"Copertina rigida",cv_note:"Copertina rigida: +20 USD per copia",spec3:"Spedizione in tutto il mondo",
 hero_cap:"COPERTINA · ESEMPIO FITTIZIO · IA",
 sample_eyebrow:"Il libro",sample_title:"Tre book, tre carriere.",
 sample_lede:"Ogni sezione si apre con una pagina di crediti: fotografo, trucco, capelli, styling, luogo, data e come hai vissuto quella giornata. Poi solo le foto di quel servizio.",
@@ -808,7 +821,7 @@ s2_t:"Invia le tue foto",s2_p:"In alta risoluzione, con i crediti e qualche paro
 s3_t:"Approva la bozza",s3_p:"Sfogli il tuo libro online, commenti qualsiasi pagina e chiedi modifiche. Niente va in stampa senza la tua approvazione.",
 s4_t:"Ricevi il tuo book",s4_p:"Stampato su carta patinata premium e spedito al tuo indirizzo, ovunque tu sia.",
 pk_eyebrow:"Pacchetti",pk_title:"Scegli quanto della tua carriera mostrare.",
-pk_lede:"Tre formati, la stessa cura. La copertina morbida mantiene il prezzo accessibile; quella rigida è fatta per durare.",
+pk_lede:"Tre formati, la stessa cura. Scegli la copertina morbida per un prezzo accessibile, o rigida per un book che dura.",
 p1_name:"Essenziale",p1_a:"Copertina morbida",p1_b:"32 pagine",p1_c:"Fino a 18 foto",
 p2_badge:"Il più scelto",p2_name:"Signature",p2_a:"Copertina morbida",p2_b:"40 pagine",p2_c:"Fino a 32 foto",
 p3_name:"Prestige",p3_a:"Copertina rigida",p3_b:"60 pagine",p3_c:"Fino a 50 foto",
@@ -975,8 +988,12 @@ document.addEventListener("keydown", e => {
 });
 
 
-// Prices (USD, before shipping). Shipping estimates by region from Lulu Mail tracked rates incl. 15% buffer (cost model v7): [soft, hard].
-const PRICES = {essentiel:{usd:129, extra:59, cover:"soft", name:1}, signature:{usd:132, extra:69, cover:"soft", name:2}, prestige:{usd:151, extra:119, cover:"hard", name:3}};
+// Prices (USD, before shipping) — v1.26: every package in softcover or hardcover (+$20 per copy). Must match lib/pricing.js.
+// Shipping estimates by region from Lulu Mail tracked rates incl. 15% buffer (cost model v7): [soft, hard].
+const PRICES = {essentiel:{usd:129, extra:59, name:1}, signature:{usd:139, extra:69, name:2}, prestige:{usd:159, extra:99, name:3}};
+const HARD_ADD = 20, HARD_EXTRA_ADD = 20;
+let COVER = "soft";
+const P = (k, c = COVER) => ({...PRICES[k], usd: PRICES[k].usd + (c === "hard" ? HARD_ADD : 0), extra: PRICES[k].extra + (c === "hard" ? HARD_EXTRA_ADD : 0)});
 const EXTRA_SHIP = 0.5; // each extra copy to the same address adds 50% of the first shipping charge (cost model v6)
 const SHIP = [[7,7],[16,16],[7,7],[12,12],[22,22],[24,24],[24,24],[24,24]];
 const LOCALE = {fr:"fr-CA", en:"en-US", es:"es-ES", pt:"pt-BR", it:"it-IT"};
@@ -993,18 +1010,23 @@ function guessRegion(){
 let estRegion = guessRegion(), estPkg = "signature", estQty = 1;
 function renderPrices(){
   const t = T[lang];
-  document.querySelectorAll("[data-price]").forEach(el => el.textContent = money(PRICES[el.dataset.price].usd));
-  document.querySelectorAll("[data-extra]").forEach(el => el.textContent = money(PRICES[el.dataset.extra].extra));
-  const ps = document.getElementById("est-pkg"), rs = document.getElementById("est-region");
-  ps.innerHTML = Object.keys(PRICES).map(k => `<option value="${k}">${t.pkg_opts[PRICES[k].name]} · ${money(PRICES[k].usd)}</option>`).join("");
+  document.querySelectorAll("[data-price]").forEach(el => el.textContent = money(P(el.dataset.price).usd));
+  document.querySelectorAll("[data-extra]").forEach(el => el.textContent = money(P(el.dataset.extra).extra));
+  document.querySelectorAll(".cv-lbl").forEach(el => el.textContent = (COVER === "hard" ? t.cv_hard : t.cv_soft) || "");
+  document.querySelectorAll('input[name="cv"]').forEach(r => r.checked = r.value === COVER);
+  document.querySelectorAll(".cv-pick small").forEach(el => el.textContent = "+" + money(HARD_ADD).replace(/\s?USD$/, ""));
+  const ps = document.getElementById("est-pkg"), rs = document.getElementById("est-region"), cs = document.getElementById("est-cover");
+  ps.innerHTML = Object.keys(PRICES).map(k => `<option value="${k}">${t.pkg_opts[PRICES[k].name]} · ${money(P(k).usd)}</option>`).join("");
   ps.value = estPkg;
+  cs.innerHTML = `<option value="soft">${t.cv_soft}</option><option value="hard">${t.cv_hard} (+${money(HARD_ADD)})</option>`;
+  cs.value = COVER;
   rs.innerHTML = (t.regions || T.en.regions).map((r, i) => `<option value="${i}">${r}</option>`).join("");
   rs.value = String(estRegion);
   updateEstimate();
 }
 function updateEstimate(){
-  const p = PRICES[estPkg], n = Math.max(1, Math.min(50, estQty || 1));
-  const ship = Math.round(SHIP[estRegion][p.cover === "soft" ? 0 : 1] * (1 + EXTRA_SHIP * (n - 1)));
+  const p = P(estPkg), n = Math.max(1, Math.min(50, estQty || 1));
+  const ship = Math.round(SHIP[estRegion][COVER === "soft" ? 0 : 1] * (1 + EXTRA_SHIP * (n - 1)));
   const extra = p.extra * (n - 1);
   document.getElementById("est-book").textContent = money(p.usd);
   document.getElementById("est-extra-l").hidden = document.getElementById("est-extra").hidden = n === 1;
@@ -1014,6 +1036,8 @@ function updateEstimate(){
   document.getElementById("est-total").textContent = "≈ " + money(p.usd + extra + ship);
 }
 document.getElementById("est-pkg").addEventListener("change", e => { estPkg = e.target.value; updateEstimate(); });
+document.getElementById("est-cover").addEventListener("change", e => { COVER = e.target.value === "hard" ? "hard" : "soft"; renderPrices(); });
+document.querySelectorAll('input[name="cv"]').forEach(r => r.addEventListener("change", e => { if (e.target.checked) { COVER = e.target.value === "hard" ? "hard" : "soft"; renderPrices(); } }));
 document.getElementById("est-region").addEventListener("change", e => { estRegion = +e.target.value; updateEstimate(); });
 document.getElementById("est-qty").addEventListener("input", e => { estQty = parseInt(e.target.value, 10) || 1; updateEstimate(); });
 const ARIA = {"Language": {"fr": "Langue", "en": "Language", "es": "Idioma", "pt": "Idioma", "it": "Lingua"}, "Sample books": {"fr": "Books exemples", "en": "Sample books", "es": "Libros de ejemplo", "pt": "Livros de exemplo", "it": "Book di esempio"}, "Previous spread": {"fr": "Planche précédente", "en": "Previous spread", "es": "Página doble anterior", "pt": "Página dupla anterior", "it": "Doppia pagina precedente"}, "Next spread": {"fr": "Planche suivante", "en": "Next spread", "es": "Página doble siguiente", "pt": "Página dupla seguinte", "it": "Doppia pagina successiva"}, "Hardcover BOOKD book": {"fr": "Book BOOKD couverture rigide", "en": "Hardcover BOOKD book", "es": "Libro BOOKD de tapa dura", "pt": "Livro BOOKD de capa dura", "it": "Book BOOKD con copertina rigida"}, "Softcover BOOKD book": {"fr": "Book BOOKD couverture souple", "en": "Softcover BOOKD book", "es": "Libro BOOKD de tapa blanda", "pt": "Livro BOOKD de capa mole", "it": "Book BOOKD con copertina morbida"}, "Type": {"fr": "Type", "en": "Type", "es": "Tipo", "pt": "Tipo", "it": "Tipo"}};
@@ -1064,7 +1088,7 @@ document.querySelectorAll("[data-pkg]").forEach(b => b.addEventListener("click",
   const label = b.innerHTML; b.disabled = true; b.textContent = PAY_WAIT[lang] || PAY_WAIT.en;
   try {
     const copies = estPkg === pkg ? Math.max(1, Math.min(50, estQty || 1)) : 1;
-    const r = await fetch("/api/checkout?action=deposit", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({package: pkg, copies, lang, code: CODE})});
+    const r = await fetch("/api/checkout?action=deposit", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({package: pkg, cover: COVER, copies, lang, code: CODE})});
     const j = await r.json();
     if (!r.ok || !j.url) throw new Error(j.error || "checkout");
     location.href = j.url;
@@ -1080,7 +1104,7 @@ form.addEventListener("submit", async e => {
   if (problem) { err.textContent = problem; err.hidden = false; return; }
   err.hidden = true;
   const disc = f.get("disc") === "" ? "—" : t.who[+f.get("disc")];
-  const pkg = t.pkg_opts[+f.get("pkg")];
+  const pkg = t.pkg_opts[+f.get("pkg")] + (+f.get("pkg") > 0 ? " · " + (COVER === "hard" ? T.en.cv_hard : T.en.cv_soft) : "");
   const btn = form.querySelector('button[type="submit"]'); btn.disabled = true;
   // 1) try to send through the site's own email function (live on Vercel)
   try {

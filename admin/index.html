@@ -66,6 +66,8 @@ main{padding:26px clamp(16px,3vw,36px);min-width:0}
 .pill.s-approved,.pill.s-paid,.pill.s-shipped,.pill.s-delivered{background:var(--good-soft);border-color:transparent;color:var(--good)}
 .pill.s-proof_sent,.pill.s-layout,.pill.s-printing{background:var(--warn-soft);border-color:transparent;color:var(--warn)}
 .pill.s-cancelled{opacity:.6}
+.cvb{display:inline-block;font-size:.7rem;font-weight:700;letter-spacing:.06em;padding:2px 8px;border-radius:5px;white-space:nowrap;vertical-align:middle}
+.cvb.hard{background:#15161B;color:#fff}.cvb.soft{background:#fff;color:#15161B;border:1.5px solid #15161B}
 /* tables */
 .tbl{width:100%;border-collapse:collapse;font-size:.9rem}
 .tbl th{text-align:left;font-family:var(--mono);font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500;padding:8px 10px;border-bottom:1px solid var(--rule)}
@@ -218,7 +220,10 @@ function openDialog(html, onSubmit, okLabel = 'Save') {
   };
   d.showModal();
 }
-function pkgOptions(sel) { return Object.entries(META.packages).map(([k, p]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${p.label} — ${p.pages} pages, ${p.cover} cover, $${p.price} (+$${p.extra}/extra copy)</option>`).join(''); }
+function pkgOptions(sel) { return Object.entries(META.packages).map(([k, p]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${p.label} — ${p.pages} pages, ${p.maxPhotos} photos · soft $${p.price} / hard $${p.price + (META.hardSurcharge || 20)}</option>`).join(''); }
+// v1.26 — the binding the CUSTOMER chose (drives the proof, the cover size and the Lulu product)
+const cvBadge = (c) => `<span class="cvb ${c === 'hard' ? 'hard' : 'soft'}" title="Cover chosen by the customer">${c === 'hard' ? 'HARDCOVER' : 'SOFTCOVER'}</span>`;
+function coverOptions(sel) { return Object.entries(META.covers || { soft: 'Softcover', hard: 'Hardcover' }).map(([k, l]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${l}${k === 'hard' ? ` (+$${META.hardSurcharge || 20})` : ''}</option>`).join(''); }
 
 /* ---------- orders list ---------- */
 let filter = '';
@@ -232,9 +237,9 @@ async function viewOrders() {
   $('#pipe').innerHTML = `<button data-s="" class="${filter ? '' : 'on'}">All <b>${total}</b></button>` + META.statuses.map(([k, l]) => `<button data-s="${k}" class="${filter === k ? 'on' : ''}">${l} <b>${counts[k] || 0}</b></button>`).join('');
   $('#pipe').onclick = e => { const b = e.target.closest('button'); if (!b) return; filter = b.dataset.s; viewOrders(); };
   const rows = list.orders;
-  $('#list').innerHTML = rows.length ? `<table class="tbl"><thead><tr><th>Ref</th><th>Customer</th><th>Package</th><th class="num">Copies</th><th class="num">Price</th><th>Paid</th><th class="num">Photos</th><th>Status</th><th>Updated</th></tr></thead><tbody>${rows.map(o => `
+  $('#list').innerHTML = rows.length ? `<table class="tbl"><thead><tr><th>Ref</th><th>Customer</th><th>Package</th><th>Cover</th><th class="num">Copies</th><th class="num">Price</th><th>Paid</th><th class="num">Photos</th><th>Status</th><th>Updated</th></tr></thead><tbody>${rows.map(o => `
     <tr class="click" data-id="${o.id}"><td class="mono">${esc(o.ref)}</td><td><b>${esc(o.customer_name)}</b><div class="small muted">${esc(o.customer_email)}</div></td>
-    <td>${esc(META.packages[o.package]?.label || o.package)}</td><td class="num">${o.copies}</td><td class="num">${money(o.price_usd)}</td>
+    <td>${esc(META.packages[o.package]?.label || o.package)}</td><td>${cvBadge(o.cover)}</td><td class="num">${o.copies}</td><td class="num">${money(o.price_usd)}</td>
     <td class="small">${o.deposit_paid ? 'Deposit ✓' : '<span class="muted">Deposit —</span>'}<br>${o.balance_paid ? 'Balance ✓' : '<span class="muted">Balance —</span>'}</td>
     <td class="num">${o.photo_count}</td><td><span class="pill s-${o.status}">${statusLabel(o.status)}</span></td><td class="small muted">${when(o.updated_at)}</td></tr>`).join('')}</tbody></table>`
     : `<div class="empty">No orders${filter ? ' with this status' : ' yet'}. Create one with “New order”, or convert a website message.</div>`;
@@ -243,7 +248,7 @@ async function viewOrders() {
 }
 function newOrder() {
   openDialog(`<h2>New order</h2><div class="grid2"><label>Customer name<input name="customer_name" required></label><label>Email<input name="customer_email" type="email" required></label></div>
-    <div class="grid2"><label>Package<select name="package">${pkgOptions('signature')}</select></label><label>Copies<input name="copies" type="number" min="1" max="50" value="1"></label></div>
+    <div class="grid3"><label>Package<select name="package">${pkgOptions('signature')}</select></label><label>Cover<select name="cover">${coverOptions('soft')}</select></label><label>Copies<input name="copies" type="number" min="1" max="50" value="1"></label></div>
     <div class="grid2"><label>Phone<input name="phone"></label><label>Customer language<select name="lang"><option>en</option><option>fr</option><option>es</option><option>pt</option><option>it</option></select></label></div>
     <label>Notes<textarea name="notes"></textarea></label>`, async f => {
     const r = await post('order-create', Object.fromEntries(f)); toast('Order created'); location.hash = 'order/' + r.id;
@@ -258,7 +263,7 @@ async function viewOrder(id) {
   const kept = d.photos.filter(p => p.keep !== false).length;
   v.innerHTML = `
   <div class="top"><div><div class="eyebrow"><a href="#orders">Orders</a> / ${esc(o.ref)}</div><h1>${esc(o.customer_name || 'Untitled')}</h1>
-    <div class="small muted">${esc(pkg.label || o.package)} · ${o.copies} cop${o.copies > 1 ? 'ies' : 'y'} · ${money(o.price_usd)} · created ${when(o.created_at)}${o.submitted_at ? ' · photos submitted ' + when(o.submitted_at) : ''}</div></div>
+    <div class="small muted">${cvBadge(o.cover)} ${esc(pkg.label || o.package)} · ${o.copies} cop${o.copies > 1 ? 'ies' : 'y'} · ${money(o.price_usd)} · created ${when(o.created_at)}${o.submitted_at ? ' · photos submitted ' + when(o.submitted_at) : ''}</div></div>
     <div class="row"><label style="min-width:200px">Status<select id="st">${META.statuses.map(([k, l]) => `<option value="${k}" ${k === o.status ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div></div>
   <div class="sheet">
     <div class="stack">
@@ -300,8 +305,9 @@ async function viewOrder(id) {
         <h2>Order details</h2>
         <div class="grid2"><label>Customer name<input name="customer_name" value="${esc(o.customer_name)}"></label><label>Email<input name="customer_email" type="email" value="${esc(o.customer_email)}"></label></div>
         <div class="grid3"><label>Package<select name="package">${Object.entries(META.packages).map(([k, p]) => `<option value="${k}" ${k === o.package ? 'selected' : ''}>${p.label}</option>`).join('')}</select></label>
-          <label>Copies<input name="copies" type="number" min="1" max="50" value="${o.copies}"></label><label>Price (USD)<input name="price_usd" type="number" step="0.01" value="${o.price_usd ?? ''}"></label></div>
-        <div class="row"><button class="btn small" type="button" id="recalc">Recalculate price from package + copies</button></div>
+          <label>Cover <span class="small muted">(customer’s choice)</span><select name="cover">${coverOptions(o.cover)}</select></label></div>
+        <div class="grid3"><label>Copies<input name="copies" type="number" min="1" max="50" value="${o.copies}"></label><label>Price (USD)<input name="price_usd" type="number" step="0.01" value="${o.price_usd ?? ''}"></label></div>
+        <div class="row"><button class="btn small" type="button" id="recalc">Recalculate price from package + cover + copies</button></div>
         <div class="small">${o.stripe_deposit_session ? `<span class="pill s-approved">Stripe ${o.stripe_deposit_session.startsWith('cs_live') ? 'live' : 'TEST'}</span> ` : ''}${o.discount_pct ? `<span class="pill s-changes">Private code ${esc(o.discount_code || '')} −${o.discount_pct}%</span> ` : ''}Paid online: <b>${money(o.paid_usd || 0)}</b>${o.deposit_usd ? ` (deposit ${money(o.deposit_usd)})` : ''} · Balance due: <b>${money(d.balanceDue)}</b>${o.shipping_usd == null ? ' <span class="muted">— set Shipping (USD) so the customer can pay the balance from the portal</span>' : ''}</div>
         <div class="grid3"><label>Shipping (USD)<input name="shipping_usd" type="number" step="0.01" value="${o.shipping_usd ?? ''}"></label>
           <label class="chk" style="align-self:end"><input type="checkbox" name="deposit_paid" ${o.deposit_paid ? 'checked' : ''}> Deposit paid</label>
@@ -340,11 +346,11 @@ async function viewOrder(id) {
   $('#send-portal').onclick = async () => { try { const r = await post('send-portal', { id }); toast(r.emailed ? 'Link emailed to customer' : 'Email not configured — copy the link'); reload(); } catch (e) { toast(e.message); } };
   $('#details').onsubmit = async e => {
     e.preventDefault(); const f = new FormData(e.target), body = { id };
-    for (const k of ['customer_name', 'customer_email', 'package', 'copies', 'price_usd', 'shipping_usd', 'ship_name', 'phone', 'ship_address', 'ship_city', 'ship_region', 'ship_postal', 'ship_country', 'printer', 'printer_order_id', 'tracking', 'notes']) body[k] = f.get(k);
+    for (const k of ['customer_name', 'customer_email', 'package', 'cover', 'copies', 'price_usd', 'shipping_usd', 'ship_name', 'phone', 'ship_address', 'ship_city', 'ship_region', 'ship_postal', 'ship_country', 'printer', 'printer_order_id', 'tracking', 'notes']) body[k] = f.get(k);
     body.deposit_paid = f.get('deposit_paid') === 'on'; body.balance_paid = f.get('balance_paid') === 'on';
     try { await post('order-update', body); toast('Saved'); reload(); } catch (err) { toast(err.message); }
   };
-  $('#recalc').onclick = async () => { const f = new FormData($('#details')); await post('order-update', { id, package: f.get('package'), copies: f.get('copies'), recalcPrice: true }); toast('Price recalculated'); reload(); };
+  $('#recalc').onclick = async () => { const f = new FormData($('#details')); await post('order-update', { id, package: f.get('package'), cover: f.get('cover'), copies: f.get('copies'), recalcPrice: true }); toast('Price recalculated'); reload(); };
   $('#del').onclick = () => openDialog(`<h2>Delete ${esc(o.ref)}?</h2><p>This removes the order, its shoots, photos, proof PDFs and timeline, including the stored files. This can’t be undone.</p>`, async () => { await post('order-delete', { id }); toast('Order deleted'); location.hash = 'orders'; }, 'Delete');
   $('#add-note').onclick = async () => { const t = $('#note').value.trim(); if (!t) return; await post('note', { id, text: t }); reload(); };
   $('#build').onclick = async () => {
@@ -437,20 +443,22 @@ function luluCard(d) {
   const o = d.order, L = META.lulu || {}, approved = d.proofs.find(p => p.status === 'approved');
   const live = L.env === 'production', job = o.printer_order_id && /^Lulu/.test(o.printer || '');
   const lvl = o.ship_level || 'MAIL';
+  const proofCover = approved?.layout?.binding || o.cover, mismatch = approved && proofCover !== o.cover;
   return `<section class="card stack" id="lulu">
     <div class="row" style="justify-content:space-between"><h2>Print with Lulu</h2>${L.configured ? `<span class="pill ${live ? 's-approved' : 's-proof_sent'}">${live ? 'LIVE — real printing' : 'SANDBOX — test, nothing printed'}</span>` : '<span class="pill">not connected</span>'}</div>
     ${!L.configured ? '<div class="small muted">Add <b>LULU_CLIENT_KEY</b>, <b>LULU_CLIENT_SECRET</b> and <b>LULU_ENV</b> (sandbox or production) in Vercel → Settings → Environment Variables, then redeploy.</div>' : `
     ${approved && !o.balance_paid ? `<div class="warnbox">Waiting for the customer to pay the balance: <b>${money(d.balanceDue)}</b>. “Send to Lulu” unlocks when it’s paid (or tick “Balance paid” for another payment method).</div>` : ''}
     ${approved && o.balance_paid && !job ? `<div class="small" style="color:var(--good)"><b>Approved & paid — ready to print.</b></div>` : ''}
-    <div class="small muted">${approved ? `Prints the <b>approved proof v${approved.version}</b> (${approved.page_count} pages, ${esc(approved.layout?.binding === 'hard' ? 'hardcover' : 'softcover')}) · ${o.copies} cop${o.copies > 1 ? 'ies' : 'y'} · ships to ${esc([o.ship_city, o.ship_country].filter(Boolean).join(', ') || 'no address yet')}` : 'Waiting for the customer to approve a proof.'}</div>
+    <div class="row"><span class="small">Customer chose</span> ${cvBadge(o.cover)} ${approved ? (mismatch ? `<span class="pill s-changes">✗ proof v${approved.version} was built for ${proofCover === 'hard' ? 'hardcover' : 'softcover'}: build a new proof</span>` : `<span class="pill s-approved">✓ approved proof and Lulu product match</span>`) : ''}</div>
+    <div class="small muted">${approved ? `Prints the <b>approved proof v${approved.version}</b> (${approved.page_count} pages, ${esc(proofCover === 'hard' ? 'hardcover' : 'softcover')}) · ${o.copies} cop${o.copies > 1 ? 'ies' : 'y'} · ships to ${esc([o.ship_city, o.ship_country].filter(Boolean).join(', ') || 'no address yet')}` : 'Waiting for the customer to approve a proof.'}</div>
     <div class="row"><label style="min-width:220px">Shipping<select id="lulu-level">${(L.levels || ['MAIL']).map(l => `<option ${l === lvl ? 'selected' : ''} value="${l}">${l.replace('_', ' ').toLowerCase()}</option>`).join('')}</select></label></div>
     <div class="row"><button class="btn" type="button" id="lulu-quote" ${approved ? '' : 'disabled'}>Get Lulu price</button>
-      <button class="btn primary" type="button" id="lulu-send" ${approved && o.balance_paid && (!job || ['CANCELED', 'REJECTED', 'ERROR'].includes(o.printer_status)) ? '' : 'disabled'}>Send to Lulu</button>
+      <button class="btn primary" type="button" id="lulu-send" ${approved && !mismatch && o.balance_paid && (!job || ['CANCELED', 'REJECTED', 'ERROR'].includes(o.printer_status)) ? '' : 'disabled'}>Send to Lulu</button>
       ${job ? `<button class="btn" type="button" id="lulu-refresh">Refresh status</button>${['CREATED', 'UNPAID'].includes(o.printer_status) ? '<button class="btn ghost" type="button" id="lulu-cancel">Cancel job</button>' : ''}` : ''}</div>`}
     ${job ? `<dl class="kv"><dt>Print job</dt><dd>${esc(o.printer_order_id)} <span class="muted small">(${esc(o.printer_env || '')})</span></dd><dt>Lulu status</dt><dd><b>${esc(o.printer_status || '—')}</b></dd>
-      <dt>Lulu cost</dt><dd>${esc(o.printer_cost || '—')}</dd><dt>Tracking</dt><dd>${esc(o.tracking || '—')}</dd></dl>
+      <dt>Lulu cost</dt><dd>${esc(o.printer_cost || '—')}</dd><dt>Lulu promo</dt><dd>${o.lulu_promo_checked_at ? (o.lulu_promo ? `<b>${esc(o.lulu_promo)}</b>` : 'checked — none available') : '<span class="muted">not checked</span>'}</dd><dt>Tracking</dt><dd>${esc(o.tracking || '—')}</dd></dl>
       ${['REJECTED', 'ERROR'].includes(o.printer_status) ? `<div class="warnbox"><b>Lulu rejected the files.</b> The reason is in the Timeline below. Once fixed, click “Send to Lulu” again: a new print job is created (the approved proof stays approved).</div>` : ''}
-      ${o.printer_status === 'UNPAID' ? `<div class="warnbox">Lulu is waiting for payment. Open <a href="https://developers${o.printer_env === 'production' ? '' : '.sandbox'}.lulu.com/print-jobs" target="_blank" rel="noopener">Lulu → Print Jobs</a> and pay job ${esc(o.printer_order_id)}${o.printer_env === 'production' ? '' : ' with a test card'}.</div>` : ''}` : ''}
+      ${o.printer_status === 'UNPAID' ? `<div class="warnbox">Lulu is waiting for payment. Open <a href="https://developers${o.printer_env === 'production' ? '' : '.sandbox'}.lulu.com/print-jobs" target="_blank" rel="noopener">Lulu → Print Jobs</a> and pay job ${esc(o.printer_order_id)}${o.printer_env === 'production' ? '' : ' with a test card'}.${o.lulu_promo ? ` <b>Apply promo code ${esc(o.lulu_promo)} before paying.</b>` : ''}</div>` : ''}` : ''}
     <div id="lulu-out"></div>
   </section>`;
 }
@@ -462,8 +470,14 @@ function bindLulu(id, reload, d0) {
     try { const r = await post(action, { id, level: lvl(), ...(extra ? extra() : {}) }); ok(r); } catch (e) { out(`<div class="warnbox">${esc(e.message)}</div>`); b.disabled = false; } }; };
   go('#lulu-quote', 'printer-quote', null, r => { out(`<div class="small"><b>Lulu price (${esc(r.env)}):</b> ${esc(r.text)}</div>`); $('#lulu-quote').disabled = false; });
   const sendBtn = $('#lulu-send');
-  if (sendBtn) sendBtn.onclick = () => openDialog(`<h2>Send to Lulu?</h2><p>${META.lulu?.env === 'production' ? '<b>This is the LIVE account: the book will be printed and shipped, and Lulu will charge your card.</b>' : 'Sandbox: a test print job is created. Nothing is printed or charged.'}</p><p>Shipping: <b>${esc(lvl())}</b>.</p>${META.stripe?.configured && !d0.order.balance_paid ? '<div class="warnbox">The customer has not paid the balance yet.</div>' : ''}`, async () => {
-    const r = await post('printer-send', { id, level: lvl() }); toast(`Lulu print job ${r.jobId} created`); reload(); }, 'Send to Lulu');
+  if (sendBtn) sendBtn.onclick = () => { const o0 = d0.order, promo = META.luluPromo || ''; openDialog(`<h2>Send to Lulu?</h2><p>${META.lulu?.env === 'production' ? '<b>This is the LIVE account: the book will be printed and shipped, and Lulu will charge your card.</b>' : 'Sandbox: a test print job is created. Nothing is printed or charged.'}</p>
+    <dl class="kv"><dt>Cover</dt><dd>${cvBadge(o0.cover)} <span class="small muted">Lulu product ${o0.cover === 'hard' ? 'case wrap' : 'perfect bound'}</span></dd><dt>Copies</dt><dd>${o0.copies}</dd><dt>Shipping</dt><dd><b>${esc(lvl())}</b></dd></dl>
+    ${META.stripe?.configured && !o0.balance_paid ? '<div class="warnbox">The customer has not paid the balance yet.</div>' : ''}
+    <div class="note" style="background:var(--warn-soft);padding:10px 12px;border-radius:8px"><b>Before you pay Lulu: check for a promo code.</b> Lulu’s API has no promo field; promotions are applied when you pay the job in the Lulu dashboard.
+      <div class="small" style="margin-top:4px">Current promo saved in admin: <b>${promo ? esc(promo) : 'none'}</b> · <a href="https://www.lulu.com/" target="_blank" rel="noopener">Check Lulu promotions ↗</a></div>
+      <label style="margin-top:8px">Promo code I will apply (leave empty if none)<input name="promo" value="${esc(promo)}" placeholder="e.g. LULU15"></label>
+      <label style="display:flex;flex-direction:row;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" name="promoChecked" required style="width:auto;margin:0"> I checked Lulu promotions for this order</label></div>`, async f => {
+    const r = await post('printer-send', { id, level: lvl(), promoChecked: f.get('promoChecked') === 'on', promo: f.get('promo') || '' }); toast(`Lulu print job ${r.jobId} created — ${r.cover === 'hard' ? 'hardcover' : 'softcover'}${r.promo ? ' · apply promo ' + r.promo + ' when you pay' : ''}`); reload(); }, 'Send to Lulu'); };
   go('#lulu-refresh', 'printer-refresh', null, r => { toast('Lulu status: ' + r.status); reload(); });
   const c = $('#lulu-cancel');
   if (c) c.onclick = () => openDialog('<h2>Cancel the Lulu print job?</h2><p>Only possible before it is paid.</p>', async () => { await post('printer-cancel', { id }); toast('Print job cancelled'); reload(); }, 'Cancel the job');
@@ -500,11 +514,14 @@ async function viewTeam() {
   v.innerHTML = `<div class="top"><div><div class="eyebrow">Access</div><h1>Team</h1></div><button class="btn primary" id="add-admin">+ Add admin</button></div>
     <div class="card scroll"><table class="tbl"><thead><tr><th>Name</th><th>Email</th><th>Since</th><th></th></tr></thead><tbody>${r.admins.map(a => `<tr><td>${esc(a.name || '—')}</td><td>${esc(a.email)}</td><td class="small muted">${when(a.created_at)}</td>
     <td class="num">${a.id === META.admin.id ? '<span class="small muted">You</span>' : `<button class="btn ghost small danger" data-rm="${a.id}">Remove</button>`}</td></tr>`).join('')}</tbody></table></div>
+    <div class="card stack" style="max-width:520px;margin-top:16px"><h2>Lulu promo code</h2><p class="small muted">If Lulu runs a promotion, save the code here: it is shown on every “Send to Lulu” so you apply it when you pay the print job in the Lulu dashboard. Clear it when it expires.</p>
+      <div class="row"><input id="lp" value="${esc(META.luluPromo || '')}" placeholder="No current promo" style="flex:1"><button class="btn" id="lp-save">Save</button></div></div>
     <div class="card stack" style="max-width:420px;margin-top:16px"><h2>Change my password</h2><label>New password<input type="password" id="np" minlength="8"></label><button class="btn" id="chg">Update password</button></div>`;
   $('#add-admin').onclick = () => openDialog(`<h2>Add an admin</h2><p class="small muted">Give them the email and temporary password; they can change it under Team.</p>
     <div class="grid2"><label>Name<input name="name"></label><label>Email<input name="email" type="email" required></label></div><label>Temporary password<input name="password" required minlength="8"></label>`,
     async f => { await post('admin-add', Object.fromEntries(f)); toast('Admin added'); viewTeam(); });
   v.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => openDialog('<h2>Remove this admin?</h2><p>They will no longer be able to sign in.</p>', async () => { await post('admin-remove', { id: +b.dataset.rm }); viewTeam(); }));
+  $('#lp-save').onclick = async () => { try { const r = await post('settings-save', { lulu_promo: $('#lp').value }); META.luluPromo = r.luluPromo; toast(r.luluPromo ? 'Lulu promo saved: ' + r.luluPromo : 'Lulu promo cleared'); } catch (e) { toast(e.message); } };
   $('#chg').onclick = async () => { try { await post('password', { password: $('#np').value }); toast('Password updated'); $('#np').value = ''; } catch (e) { toast(e.message); } };
 }
 
