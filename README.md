@@ -1,4 +1,4 @@
-# BOOKD — v1.26
+# BOOKD — v1.27
 
 Public site (5 languages) + performer portal + admin back office (English).
 
@@ -175,3 +175,6 @@ Test card: **4242 4242 4242 4242**, any future date, any CVC, any postal code. P
 - **Performer portal:** shows "Your book: Signature · Softcover" with "Upgrade to hardcover · +$20" (added to the balance, like package upgrades). Upgrades = list-price difference.
 - **Lulu promo check before paying:** Lulu's Print API has no promo-code field — promotions are applied when you pay the print job in the Lulu dashboard. "Send to Lulu" now asks you to tick "I checked Lulu promotions" and note the code you will use; it is saved on the order and shown again next to "pay job …". Save the current promo once under **Team → Lulu promo code** (clear it when it expires).
 - Database: new columns `orders.cover`, `orders.lulu_promo`, `orders.lulu_promo_checked_at` and table `settings` — created automatically on first load. No new environment variables.
+
+## v1.27 — Restricted live Stripe key
+- A restricted live key (`rk_live_…`) now counts as **live** (admin pill, checkout config). Recommended key for BOOKD: Stripe → Developers → API keys → Create restricted key → "Powering an integration you built", permissions **Checkout Sessions: Write, Customers: Write, PaymentIntents: Read**, everything else None. Paste it in Vercel as `STRIPE_SECRET_KEY`.
