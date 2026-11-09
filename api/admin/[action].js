@@ -15,6 +15,7 @@ import { ORNAMENTS, ORNAMENT_COLORS, ornamentKey, ornamentColor } from '../../li
 import { createOrder, balanceDue, duplicateOrder } from '../../lib/orders.js';
 import { buildProof, refreshPrintFiles } from '../../lib/proofs.js';
 import { hasStripe, stripeMode } from '../../lib/stripe.js';
+import { runAssistant, hasAssistant } from '../../lib/assistant.js';
 
 const token = () => crypto.randomBytes(24).toString('hex');
 const STATUS_KEYS = STATUSES.map(s => s[0]);
@@ -69,7 +70,11 @@ export default async function handler(req, res) {
 
     switch (action) {
       case 'me': return res.json({ ok: true, admin, statuses: STATUSES, packages: PACKAGES, blob: hasBlob(), lulu: { configured: lulu.hasLulu(), env: lulu.luluEnv(), levels: lulu.SHIPPING_LEVELS }, stripe: { configured: hasStripe(), mode: stripeMode() }, templates: TEMPLATES, ornaments: ORNAMENTS, ornamentColors: ORNAMENT_COLORS,
-        covers: COVERS, hardSurcharge: HARD_SURCHARGE, hardExtraSurcharge: HARD_EXTRA_SURCHARGE, luluPromo: (await getSetting('lulu_promo')) || '' });
+        covers: COVERS, hardSurcharge: HARD_SURCHARGE, hardExtraSurcharge: HARD_EXTRA_SURCHARGE, luluPromo: (await getSetting('lulu_promo')) || '', assistant: hasAssistant() });
+      case 'assistant': { // v1.31 — BOOKD Assistant (read-only tools)
+        try { const r = await runAssistant({ messages: body.messages, orderRef: body.orderRef ? clip(String(body.orderRef), 20) : null, adminName: who }); return res.json({ ok: true, ...r }); }
+        catch (e) { return fail(res, e.status || 500, e.message); }
+      }
       case 'settings-save': { // v1.26 — the current Lulu promo code (shown on every "Send to Lulu" panel as a reminder)
         if ('lulu_promo' in body) { const v = clip(String(body.lulu_promo || '').trim(), 200); await setSetting('lulu_promo', v); return res.json({ ok: true, luluPromo: v }); }
         return res.json({ ok: true });

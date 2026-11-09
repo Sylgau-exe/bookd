@@ -66,6 +66,22 @@ main{padding:26px clamp(16px,3vw,36px);min-width:0}
 .pill.s-approved,.pill.s-paid,.pill.s-shipped,.pill.s-delivered{background:var(--good-soft);border-color:transparent;color:var(--good)}
 .pill.s-proof_sent,.pill.s-layout,.pill.s-printing{background:var(--warn-soft);border-color:transparent;color:var(--warn)}
 .pill.s-cancelled{opacity:.6}
+#ai-fab{position:fixed;right:20px;bottom:20px;z-index:50;background:#15161B;color:#fff;border:0;border-radius:999px;padding:12px 18px;font:600 .95rem/1 inherit;box-shadow:0 8px 24px rgba(0,0,0,.25);cursor:pointer}
+#ai{position:fixed;right:20px;bottom:20px;z-index:60;width:min(440px,calc(100vw - 32px));height:min(640px,calc(100vh - 40px));background:#fff;border:1px solid var(--rule);border-radius:16px;box-shadow:0 18px 48px rgba(0,0,0,.25);display:flex;flex-direction:column;overflow:hidden}
+#ai header{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--rule);background:#15161B;color:#fff}
+#ai header .ai-ctx{font-size:.75rem;opacity:.75;flex:1}
+#ai header button{background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:6px;padding:3px 8px;font-size:.75rem;cursor:pointer;margin-left:4px}
+#ai-log{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:10px;font-size:.92rem;line-height:1.45}
+#ai-log .m{padding:9px 12px;border-radius:12px;max-width:92%;white-space:normal;overflow-wrap:anywhere}
+#ai-log .m.u{align-self:flex-end;background:var(--accent-soft,#fde7ee)}
+#ai-log .m.a{align-self:flex-start;background:var(--bg,#f3f4f6)}
+#ai-log .m.a p{margin:0 0 6px}#ai-log .m.a ol,#ai-log .m.a ul{margin:4px 0 6px 18px;padding:0}#ai-log .m.a pre{white-space:pre-wrap;font-size:.8rem;margin:4px 0}
+#ai-log .m.t{align-self:flex-start;font-size:.75rem;color:var(--muted);background:none;padding:0 4px}
+#ai-chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 8px}
+#ai-chips button{border:1px solid var(--rule);background:#fff;border-radius:999px;padding:5px 10px;font-size:.8rem;cursor:pointer}
+#ai-form{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--rule)}
+#ai-form textarea{flex:1;resize:none;font:inherit;padding:8px 10px;border:1px solid var(--rule);border-radius:10px}
+#ai .ai-foot{font-size:.7rem;color:var(--muted);padding:0 14px 10px}
 .cvb{display:inline-block;font-size:.7rem;font-weight:700;letter-spacing:.06em;padding:2px 8px;border-radius:5px;white-space:nowrap;vertical-align:middle}
 .cvb.hard{background:#15161B;color:#fff}.cvb.soft{background:#fff;color:#15161B;border:1.5px solid #15161B}
 /* tables */
@@ -153,6 +169,16 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   <main id="view"></main>
 </div>
 
+<!-- v1.31 — BOOKD Assistant -->
+<button id="ai-fab" type="button" hidden>✦ <span data-ai="fab">Ask BOOKD</span></button>
+<aside id="ai" hidden aria-label="BOOKD Assistant">
+  <header><b>✦ BOOKD Assistant</b><span class="ai-ctx" id="ai-ctx"></span>
+    <span class="ai-tools"><button type="button" id="ai-lang" title="Langue / Language">FR</button><button type="button" id="ai-new" data-ai="new">New</button><button type="button" id="ai-x" aria-label="Close">✕</button></span></header>
+  <div id="ai-log"></div>
+  <div id="ai-chips"></div>
+  <form id="ai-form"><textarea id="ai-in" rows="2"></textarea><button class="btn primary" id="ai-send" data-ai="send">Ask</button></form>
+  <div class="ai-foot" data-ai="foot"></div>
+</aside>
 <dialog id="dlg"><form method="dialog" id="dlg-form" class="stack"></form></dialog>
 
 <script>
@@ -193,6 +219,7 @@ $('#logout').onclick = signOut;
 async function start() {
   if (!TOKEN) return showAuth();
   try { META = await api('me'); } catch { return; }
+  aiInit();
   $('#auth').hidden = true; $('#app').hidden = false;
   $('#who').textContent = META.admin.name || META.admin.email;
   route(); refreshUnread();
@@ -540,6 +567,69 @@ async function viewTeam() {
   $('#chg').onclick = async () => { try { await post('password', { password: $('#np').value }); toast('Password updated'); $('#np').value = ''; } catch (e) { toast(e.message); } };
 }
 
+/* ---------- v1.31 BOOKD Assistant ---------- */
+const AI_T = {
+  en: { fab: 'Ask BOOKD', new: 'New', send: 'Ask', foot: 'Reads orders and Lulu — it never clicks or pays for you. Check important steps.', ph: 'Ask anything about BOOKD or this order…',
+    hello: 'Hi! I know the BOOKD procedure and can read your orders and Lulu. What do you need?', thinking: 'Looking…', list: 'Orders list',
+    chipsOrder: ['What is the next step for this order?', 'Explain the warnings on this order', 'Is it ready to send to Lulu?', 'Where is the book now?'],
+    chipsList: ['Which orders need me today?', 'How do I start a new order?', 'How do I print a softcover and a hardcover of the same book?'] },
+  fr: { fab: 'Demander à BOOKD', new: 'Nouveau', send: 'Demander', foot: 'Lit les commandes et Lulu — ne clique ni ne paie jamais à votre place. Vérifiez les étapes importantes.', ph: 'Posez votre question sur BOOKD ou cette commande…',
+    hello: 'Bonjour! Je connais la procédure BOOKD et je peux lire vos commandes et Lulu. Comment puis-je aider?', thinking: 'Je regarde…', list: 'Liste des commandes',
+    chipsOrder: ['Quelle est la prochaine étape pour cette commande?', 'Explique les avertissements de cette commande', 'Est-ce prêt à envoyer à Lulu?', 'Où est le livre en ce moment?'],
+    chipsList: ['Quelles commandes demandent mon attention aujourd’hui?', 'Comment démarrer une nouvelle commande?', 'Comment imprimer une couverture souple et une rigide du même livre?'] },
+};
+let AI_LANG = 'en', AI_LOG = []; try { AI_LANG = localStorage.getItem('bookd_ai_lang') || 'en'; AI_LOG = JSON.parse(sessionStorage.getItem('bookd_ai_log') || '[]'); } catch {}
+const aiOrderId = () => (location.hash.match(/order\/(\d+)/) || [])[1] || null;
+function aiMd(s) {
+  const lines = esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>').split('\n');
+  let out = '', list = null;
+  const close = () => { if (list) { out += `</${list}>`; list = null; } };
+  for (const ln of lines) {
+    let m;
+    if ((m = ln.match(/^\s*\d+[.)]\s+(.*)/))) { if (list !== 'ol') { close(); out += '<ol>'; list = 'ol'; } out += `<li>${m[1]}</li>`; }
+    else if ((m = ln.match(/^\s*[-•*]\s+(.*)/))) { if (list !== 'ul') { close(); out += '<ul>'; list = 'ul'; } out += `<li>${m[1]}</li>`; }
+    else if (/^\s*\|/.test(ln)) { close(); out += `<pre>${ln}</pre>`; }
+    else if (ln.trim()) { close(); out += `<p>${ln.replace(/^#+\s*/, '')}</p>`; }
+  }
+  close(); return out;
+}
+function aiRender() {
+  const L = AI_T[AI_LANG], id = aiOrderId();
+  document.querySelectorAll('[data-ai]').forEach(el => { const k = el.dataset.ai; if (L[k]) el.textContent = L[k]; });
+  $('#ai-lang').textContent = AI_LANG === 'en' ? 'FR' : 'EN'; $('#ai-in').placeholder = L.ph;
+  $('#ai-ctx').textContent = id ? '· ' + ($('h1')?.closest('.top')?.querySelector('.eyebrow')?.textContent.split('/').pop().trim() || 'order #' + id) : '· ' + L.list;
+  const log = $('#ai-log');
+  log.innerHTML = (AI_LOG.length ? '' : `<div class="m a"><p>${esc(L.hello)}</p></div>`) + AI_LOG.map(m => m.role === 'user' ? `<div class="m u">${esc(m.content)}</div>`
+    : m.role === 'tools' ? `<div class="m t">↳ ${esc(m.content)}</div>` : `<div class="m a">${aiMd(m.content)}</div>`).join('');
+  log.scrollTop = log.scrollHeight;
+  $('#ai-chips').innerHTML = (id ? L.chipsOrder : L.chipsList).map(c => `<button type="button">${esc(c)}</button>`).join('');
+}
+async function aiAsk(text) {
+  text = String(text || '').trim(); if (!text) return;
+  AI_LOG.push({ role: 'user', content: text }); $('#ai-in').value = ''; aiRender();
+  const L = AI_T[AI_LANG]; const wait = document.createElement('div'); wait.className = 'm t'; wait.textContent = L.thinking; $('#ai-log').appendChild(wait);
+  $('#ai-send').disabled = true;
+  try {
+    const id = aiOrderId();
+    const r = await post('assistant', { orderRef: id, messages: AI_LOG.filter(m => m.role !== 'tools') });
+    if (r.toolsUsed?.length) AI_LOG.push({ role: 'tools', content: r.toolsUsed.join(' · ') });
+    AI_LOG.push({ role: 'assistant', content: r.reply || '…' });
+  } catch (e) { AI_LOG.push({ role: 'assistant', content: '⚠️ ' + e.message }); }
+  try { sessionStorage.setItem('bookd_ai_log', JSON.stringify(AI_LOG.slice(-30))); } catch {}
+  $('#ai-send').disabled = false; aiRender();
+}
+function aiInit() {
+  if (!META.assistant) return;
+  $('#ai-fab').hidden = false; aiRender();
+  $('#ai-fab').onclick = () => { $('#ai').hidden = false; $('#ai-fab').hidden = true; aiRender(); $('#ai-in').focus(); };
+  $('#ai-x').onclick = () => { $('#ai').hidden = true; $('#ai-fab').hidden = false; };
+  $('#ai-new').onclick = () => { AI_LOG = []; try { sessionStorage.removeItem('bookd_ai_log'); } catch {} aiRender(); };
+  $('#ai-lang').onclick = () => { AI_LANG = AI_LANG === 'en' ? 'fr' : 'en'; try { localStorage.setItem('bookd_ai_lang', AI_LANG); } catch {} aiRender(); };
+  $('#ai-chips').onclick = e => { const b = e.target.closest('button'); if (b) aiAsk(b.textContent); };
+  $('#ai-form').onsubmit = e => { e.preventDefault(); aiAsk($('#ai-in').value); };
+  $('#ai-in').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); aiAsk($('#ai-in').value); } };
+  window.addEventListener('hashchange', () => { if (!$('#ai').hidden) setTimeout(aiRender, 400); });
+}
 start();
 </script>
 </body>

@@ -1,4 +1,4 @@
-# BOOKD — v1.30
+# BOOKD — v1.31
 
 Public site (5 languages) + performer portal + admin back office (English).
 
@@ -197,3 +197,14 @@ Test card: **4242 4242 4242 4242**, any future date, any CVC, any postal code. P
 
 ## v1.30 — Long street addresses for Lulu
 - Lulu accepts 30 characters per address line. A longer street address is now split automatically over line 1 + line 2 (at a comma or a space), e.g. "1234 avenue Van Horne, appartement 5" → "1234 avenue Van Horne" / "appartement 5". A line break typed by the customer is kept. If even line 2 is over 30 characters, the Lulu panel asks you to shorten it in Order details.
+
+## v1.31 — BOOKD Assistant (in the admin)
+- A **✦ Ask BOOKD** button (bottom right of every admin page) opens a chat with Claude that knows the whole BOOKD procedure
+  (`lib/assistant-guide.js` — the operations guide, edit it in plain words when a procedure changes) and can READ:
+  the orders list, one order in full (payments, address as sent to Lulu, shoots, photos, proofs + warnings, Lulu job, related orders, timeline),
+  a Lulu price (no charge) and the live Lulu job status. On an order page, "this order" = the order you are looking at.
+- One-click questions ("What is the next step for this order?", "Is it ready to send to Lulu?", …), FR/EN switch, answers in the language you write in.
+- Read-only: it explains and tells you what to click; it never clicks, sends, pays or deletes.
+- **Setup:** Vercel → Settings → Environment Variables → `ANTHROPIC_API_KEY` = an API key from console.anthropic.com (Settings → API keys),
+  then Redeploy. Optional `BOOKD_ASSISTANT_MODEL` (default `claude-sonnet-5-5`). Without the key the button is hidden.
+- Cost: pay per use on the Anthropic account (Claude Sonnet 5.5: $2 / $10 per million input / output tokens) — about 2–4 US cents per question; the guide is cached.
