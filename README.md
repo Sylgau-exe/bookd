@@ -1,4 +1,4 @@
-# BOOKD — v1.31
+# BOOKD — v1.32
 
 Public site (5 languages) + performer portal + admin back office (English).
 
@@ -208,3 +208,12 @@ Test card: **4242 4242 4242 4242**, any future date, any CVC, any postal code. P
 - **Setup:** Vercel → Settings → Environment Variables → `ANTHROPIC_API_KEY` = an API key from console.anthropic.com (Settings → API keys),
   then Redeploy. Optional `BOOKD_ASSISTANT_MODEL` (default `claude-sonnet-5-5`). Without the key the button is hidden.
 - Cost: pay per use on the Anthropic account (Claude Sonnet 5.5: $2 / $10 per million input / output tokens) — about 2–4 US cents per question; the guide is cached.
+
+## v1.32 — "Need help?" on the performer's page
+- A **✦ Need help? / Besoin d'aide?** button on the customer page opens a helper (same Claude engine as the admin assistant) that sees ONLY that customer's book.
+- It can: list **what's missing** before "Send for layout" (bio, shipping, credits, stories, cover, TOO SMALL photos, too many photos);
+  **write with them** — bio, the story of a shoot, a shoot title — in a fashion-editor voice from a few words, with a **Use this text** button that saves it into the right field (or Copy);
+  answer questions (proof, covers, upgrades, prices, delivery, more copies). FR/EN (follows the browser language, switchable).
+- It never pays, approves or deletes. Questions are also allowed after approval (e.g. "when will I get my book?"), but texts can no longer be inserted.
+- Limit: 40 questions per book (Vercel env `CUSTOMER_AI_LIMIT` to change). Count stored in `orders.ai_count` (created automatically).
+- Its knowledge: `lib/customer-guide.js` (plain words, edit after feedback from Yves). Uses the same `ANTHROPIC_API_KEY`; without it the button is hidden.

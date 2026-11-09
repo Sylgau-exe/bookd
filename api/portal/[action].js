@@ -10,6 +10,7 @@ import { KIND_LABELS } from '../../lib/layout.js';
 import { balanceDue } from '../../lib/orders.js';
 import { buildProof } from '../../lib/proofs.js';
 import { hasStripe } from '../../lib/stripe.js';
+import { runCustomerAssistant, hasAssistant, CUSTOMER_AI_LIMIT } from '../../lib/assistant.js';
 
 const LOCKED = ['approved', 'paid', 'printing', 'shipped', 'delivered', 'cancelled'];
 const PROFILE_KEYS = ['name', 'role', 'bio', 'height', 'languages', 'agency', 'city', 'contact', 'website'];
@@ -52,9 +53,13 @@ export default async function handler(req, res) {
           content_at: order.content_at, profile: order.profile || {}, ship: Object.fromEntries(SHIP_KEYS.map(k => [k, order[k] || ''])), submitted_at: order.submitted_at,
           pay: { online: hasStripe(), price: order.price_usd == null ? null : +order.price_usd, shipping: order.shipping_usd == null ? null : +order.shipping_usd,
             paid: +(order.paid_usd || order.deposit_usd || 0), discount: +(order.discount_pct || 0), deposit_paid: !!order.deposit_paid, balance_paid: !!order.balance_paid, due: balanceDue(order) } },
-        shoots, photos, proof, comments });
+        shoots, photos, proof, comments, help: hasAssistant() ? { left: Math.max(0, CUSTOMER_AI_LIMIT() - Number(order.ai_count || 0)) } : null });
     }
     const body = req.method === 'POST' && !['upload', 'shoot-image'].includes(action) ? await readJson(req) : {};
+    if (action === 'assistant') { // v1.32 — "Need help?" (questions allowed even when the book is locked)
+      try { const r = await runCustomerAssistant({ order, messages: body.messages }); return res.json({ ok: true, ...r }); }
+      catch (e) { return fail(res, e.status || 500, e.message); }
+    }
     if (locked && !['proof-comment'].includes(action)) return fail(res, 403, 'This book is approved and locked. Write to us if you need a change.');
     // remember when the performer last changed something that is printed (to offer "Update my proof")
     if (['profile', 'shoot-save', 'shoot-delete', 'shoot-move', 'upload', 'photo-register', 'photo-delete', 'photo-cover', 'photo-move', 'shoot-image', 'shoot-image-delete', 'upgrade'].includes(action)

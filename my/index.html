@@ -14,6 +14,23 @@ window.onunhandledrejection = function (e) { console.error('Portal promise:', e.
 </script>
 <style>
 /* Layout: a calm, guided workspace — four numbered steps (they are a real sequence), one card per step, photo grids per shoot, and the proof as page spreads. */
+#hp-fab{position:fixed;right:18px;bottom:18px;z-index:50;background:var(--accent);color:var(--on-accent);border:0;border-radius:999px;padding:13px 20px;font:600 1rem/1 inherit;box-shadow:0 8px 24px rgba(0,0,0,.25);cursor:pointer}
+#hp{position:fixed;right:18px;bottom:18px;z-index:60;width:min(430px,calc(100vw - 24px));height:min(620px,calc(100vh - 36px));background:var(--surface);color:var(--ink);border:1px solid var(--rule);border-radius:16px;box-shadow:0 18px 48px rgba(0,0,0,.25);display:flex;flex-direction:column;overflow:hidden}
+#hp header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--accent);color:var(--on-accent)}
+#hp header button{background:transparent;border:1px solid currentColor;color:inherit;border-radius:6px;padding:3px 8px;font-size:.75rem;cursor:pointer;margin-left:4px;opacity:.85}
+#hp-log{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:10px;font-size:.95rem;line-height:1.45}
+#hp-log .m{padding:9px 12px;border-radius:12px;max-width:92%;overflow-wrap:anywhere}
+#hp-log .m.u{align-self:flex-end;background:var(--accent-soft)}
+#hp-log .m.a{align-self:flex-start;background:var(--bg)}
+#hp-log .m.a p{margin:0 0 6px}#hp-log .m.a ol,#hp-log .m.a ul{margin:4px 0 6px 18px;padding:0}
+#hp-log .sg{align-self:stretch;border:1.5px solid var(--accent);border-radius:12px;padding:10px 12px;background:var(--surface)}
+#hp-log .sg .lbl{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:6px}
+#hp-log .sg .tx{white-space:pre-wrap;margin-bottom:8px}
+#hp-chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 8px}
+#hp-chips button{border:1px solid var(--rule);background:var(--surface);color:var(--ink);border-radius:999px;padding:6px 11px;font-size:.82rem;cursor:pointer}
+#hp-form{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--rule)}
+#hp-form textarea{flex:1;resize:none;font:inherit;padding:8px 10px;border:1px solid var(--rule);border-radius:10px;background:var(--surface);color:var(--ink)}
+#hp .hp-foot{font-size:.72rem;color:var(--muted);padding:0 14px 10px}
 :root{--bg:#F4F5F7;--surface:#FFFFFF;--ink:#15161B;--muted:#5B5E68;--rule:#E1E3E8;--accent:#B0123B;--accent-soft:rgba(176,18,59,.08);--on-accent:#fff;--warn:#A15C00;--warn-soft:rgba(161,92,0,.1);--good:#1F7A4D;--good-soft:rgba(31,122,77,.1);
 --page:#FBFBFA;--page-ink:#17181C;--page-muted:#6A6C73;
 --display:"Bodoni Moda",Georgia,serif;--body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"JetBrains Mono",ui-monospace,Menlo,monospace}
@@ -130,6 +147,15 @@ textarea{min-height:90px;resize:vertical}
 </head>
 <body>
 <div id="toast" hidden></div>
+<!-- v1.32 — "Need help?" helper -->
+<button id="hp-fab" type="button" hidden>✦ <span data-hp="fab">Need help?</span></button>
+<aside id="hp" hidden aria-label="BOOKD helper">
+  <header><b>✦ <span data-hp="title">BOOKD helper</span></b><span class="hp-tools"><button type="button" id="hp-lang">FR</button><button type="button" id="hp-x" aria-label="Close">✕</button></span></header>
+  <div id="hp-log"></div>
+  <div id="hp-chips"></div>
+  <form id="hp-form"><textarea id="hp-in" rows="2"></textarea><button class="btn primary" id="hp-send" data-hp="send">Ask</button></form>
+  <div class="hp-foot" id="hp-foot"></div>
+</aside>
 <div class="wrap">
   <header class="top"><span class="mark">BOOK<i>D</i></span><span class="small muted" id="ref"></span></header>
   <div id="root"><div class="center muted">Loading your book…</div></div>
@@ -156,7 +182,7 @@ async function load() {
   else if (D.proof?.status === 'sent' && !location.hash && !PAID) step = 'proof';
   seenProof = D.proof ? `${D.proof.version}:${D.proof.status}` : '';
   if (PAID === 'upgrade' || location.hash === '#shoots') step = 'shoots';
-  render();
+  render(); hpInit();
 }
 function stepsDone() {
   const pf = D.order.profile, sh = D.order.ship;
@@ -477,6 +503,80 @@ setInterval(async () => {
   try { const n = await api('get'); const key = n.proof ? `${n.proof.version}:${n.proof.status}` : '';
     if (key !== seenProof && n.proof?.status === 'sent') { D = n; seenProof = key; step = 'proof'; render(); toast(`Your proof is ready — version ${n.proof.version}`); } else seenProof = key; } catch {}
 }, 45000);
+/* ---------- v1.32 "Need help?" ---------- */
+const HP_T = {
+  en: { fab: 'Need help?', title: 'BOOKD helper', send: 'Ask', ph: 'Ask anything, or tell me about a shoot…', use: 'Use this text', used: 'Added to your book ✓', copy: 'Copy',
+    hello: "Hi! I'm here to help you finish your book. I can check what's missing, write your bio or the story of a shoot with you, and answer any question.",
+    left: (n) => `${n} questions left for this book · I never pay, approve or delete anything for you.`, wait: 'Thinking…',
+    lbl: { bio: 'Your bio', story: 'Story — shoot', title: 'Title — shoot' },
+    chips: ["What's missing before I send my book?", 'Help me write my bio', 'Help me write the story of a shoot', 'When will I receive my book?'] },
+  fr: { fab: 'Besoin d’aide?', title: 'Aide BOOKD', send: 'Demander', ph: 'Posez votre question, ou parlez-moi d’une séance photo…', use: 'Utiliser ce texte', used: 'Ajouté à votre livre ✓', copy: 'Copier',
+    hello: 'Bonjour! Je suis là pour vous aider à terminer votre livre. Je peux vérifier ce qui manque, écrire votre bio ou l’histoire d’une séance avec vous, et répondre à vos questions.',
+    left: (n) => `${n} questions restantes pour ce livre · Je ne paie, n’approuve et ne supprime jamais rien à votre place.`, wait: 'Je réfléchis…',
+    lbl: { bio: 'Votre bio', story: 'Histoire — séance', title: 'Titre — séance' },
+    chips: ['Qu’est-ce qui manque avant d’envoyer mon livre?', 'Aidez-moi à écrire ma bio', 'Aidez-moi à écrire l’histoire d’une séance', 'Quand vais-je recevoir mon livre?'] },
+};
+let HP_LANG = 'en', HP_LOG = [], HP_LEFT = null;
+try { HP_LANG = localStorage.getItem('bookd_hp_lang') || ((navigator.language || '').startsWith('fr') ? 'fr' : 'en'); HP_LOG = JSON.parse(sessionStorage.getItem('bookd_hp_' + T) || '[]'); } catch {}
+function hpMd(s) {
+  const lines = esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').split('\n'); let out = '', list = null;
+  const close = () => { if (list) { out += `</${list}>`; list = null; } };
+  for (const ln of lines) { let m;
+    if ((m = ln.match(/^\s*\d+[.)]\s+(.*)/))) { if (list !== 'ol') { close(); out += '<ol>'; list = 'ol'; } out += `<li>${m[1]}</li>`; }
+    else if ((m = ln.match(/^\s*[-•*]\s+(.*)/))) { if (list !== 'ul') { close(); out += '<ul>'; list = 'ul'; } out += `<li>${m[1]}</li>`; }
+    else if (ln.trim()) { close(); out += `<p>${ln.replace(/^#+\s*/, '')}</p>`; } }
+  close(); return out;
+}
+function hpSave() { try { sessionStorage.setItem('bookd_hp_' + T, JSON.stringify(HP_LOG.slice(-30))); } catch {} }
+function hpRender() {
+  const L = HP_T[HP_LANG];
+  document.querySelectorAll('[data-hp]').forEach(el => { const k = el.dataset.hp; if (typeof L[k] === 'string') el.textContent = L[k]; });
+  $('#hp-lang').textContent = HP_LANG === 'en' ? 'FR' : 'EN'; $('#hp-in').placeholder = L.ph;
+  $('#hp-foot').textContent = HP_LEFT == null ? '' : L.left(HP_LEFT);
+  const locked = !!D?.order?.locked;
+  $('#hp-log').innerHTML = `<div class="m a"><p>${esc(L.hello)}</p></div>` + HP_LOG.map((m, i) => m.role === 'user' ? `<div class="m u">${esc(m.content)}</div>`
+    : m.role === 'sg' ? `<div class="sg"><div class="lbl">${esc(L.lbl[m.field] || '')}${m.shoot_position ? ' ' + m.shoot_position : ''}</div><div class="tx">${esc(m.text)}</div>
+        ${m.done ? `<div class="small" style="color:var(--good)">${esc(L.used)}</div>` : `<div class="row">${locked ? '' : `<button class="btn primary small" type="button" data-use="${i}">${esc(L.use)}</button>`}<button class="btn small" type="button" data-copy="${i}">${esc(L.copy)}</button></div>`}</div>`
+    : `<div class="m a">${hpMd(m.content)}</div>`).join('');
+  $('#hp-log').scrollTop = $('#hp-log').scrollHeight;
+  $('#hp-chips').innerHTML = L.chips.map(c => `<button type="button">${esc(c)}</button>`).join('');
+}
+async function hpUse(i) {
+  const s = HP_LOG[i]; if (!s) return;
+  try {
+    if (s.field === 'bio') { await api('profile', { profile: { bio: s.text } }); D.order.profile.bio = s.text; }
+    else {
+      const sh = D.shoots[(s.shoot_position || 1) - 1]; if (!sh) throw new Error(HP_LANG === 'fr' ? 'Séance introuvable : ajoutez-la d’abord.' : 'Shoot not found: add it first.');
+      const upd = { id: sh.id, kind: sh.kind, title: sh.title || '', credits: sh.credits || [], story: sh.story || '', [s.field]: s.text };
+      await api('shoot-save', upd); Object.assign(sh, upd);
+    }
+    s.done = true; hpSave(); hpRender(); render(); toast(HP_T[HP_LANG].used);
+  } catch (e) { toast(e.message); }
+}
+async function hpAsk(text) {
+  text = String(text || '').trim(); if (!text) return;
+  HP_LOG.push({ role: 'user', content: text }); $('#hp-in').value = ''; hpRender();
+  const w = document.createElement('div'); w.className = 'm a'; w.textContent = HP_T[HP_LANG].wait; $('#hp-log').appendChild(w); $('#hp-send').disabled = true;
+  try {
+    const r = await api('assistant', { messages: HP_LOG.filter(m => m.role === 'user' || m.role === 'assistant') });
+    HP_LOG.push({ role: 'assistant', content: r.reply || '…' });
+    (r.suggestions || []).forEach(s => HP_LOG.push({ role: 'sg', ...s }));
+    if (typeof r.left === 'number') HP_LEFT = r.left;
+  } catch (e) { HP_LOG.push({ role: 'assistant', content: '⚠️ ' + e.message }); }
+  hpSave(); $('#hp-send').disabled = false; hpRender();
+}
+function hpInit() {
+  if (!D?.help || hpInit.done) return; hpInit.done = true; HP_LEFT = D.help.left;
+  $('#hp-fab').hidden = false; hpRender();
+  $('#hp-fab').onclick = () => { $('#hp').hidden = false; $('#hp-fab').hidden = true; hpRender(); $('#hp-in').focus(); };
+  $('#hp-x').onclick = () => { $('#hp').hidden = true; $('#hp-fab').hidden = false; };
+  $('#hp-lang').onclick = () => { HP_LANG = HP_LANG === 'en' ? 'fr' : 'en'; try { localStorage.setItem('bookd_hp_lang', HP_LANG); } catch {} hpRender(); };
+  $('#hp-chips').onclick = e => { const b = e.target.closest('button'); if (b) hpAsk(b.textContent); };
+  $('#hp-form').onsubmit = e => { e.preventDefault(); hpAsk($('#hp-in').value); };
+  $('#hp-in').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); hpAsk($('#hp-in').value); } };
+  $('#hp-log').onclick = e => { const u = e.target.closest('[data-use]'), c = e.target.closest('[data-copy]');
+    if (u) hpUse(+u.dataset.use); if (c) { navigator.clipboard?.writeText(HP_LOG[+c.dataset.copy].text).then(() => toast('✓'), () => {}); } };
+}
 load();
 </script>
 </body>
