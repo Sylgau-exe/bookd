@@ -3,7 +3,7 @@ import { q, one, ensureSchema, logEvent, hasDb } from '../../lib/db.js';
 import { readJson, readRaw, fail, clip, siteUrl, handle, isEmail } from '../../lib/http.js';
 import { sendMail, adminInbox } from '../../lib/mail.js';
 import { savePublic, removePublic, canClientUpload } from '../../lib/storage.js';
-import { PACKAGES, isLowRes, isTooSmall, upgradeSurcharge, shippingFor, coverOf, coverLabel, normCover, listPrice, isUpgrade } from '../../lib/pricing.js';
+import { PACKAGES, isLowRes, isTooSmall, upgradeSurcharge, shippingFor, coverOf, coverLabel, normCover, listPrice, isUpgrade, extraPrice, SHIP_USD, shipRegion } from '../../lib/pricing.js';
 import { countryCode } from '../../lib/lulu.js';
 import { hasStripe as stripeOn } from '../../lib/stripe.js';
 import { KIND_LABELS } from '../../lib/layout.js';
@@ -45,7 +45,10 @@ export default async function handler(req, res) {
       const pkg = PACKAGES[order.package] || PACKAGES.signature, cover = coverOf(order);
       return res.json({ ok: true, uploadMode: canClientUpload() ? 'blob' : 'direct', kinds: KIND_LABELS,
         order: { ref: order.ref, status: order.status, locked, customer_name: order.customer_name, package: order.package, packageLabel: pkg.label, cover, coverLabel: coverLabel(cover),
-          hardUpgrade: cover === 'soft' ? upgradeSurcharge(order.package, order.package, order.copies, 'soft', 'hard') : null, maxPhotos: pkg.maxPhotos, pages: pkg.pages, packages: Object.fromEntries(Object.entries(PACKAGES).map(([k, p]) => [k, { label: p.label, maxPhotos: p.maxPhotos, pages: p.pages, price: listPrice(k, cover), cover, upgrade: p.maxPhotos > pkg.maxPhotos ? upgradeSurcharge(order.package, k, order.copies, cover, cover) : null }])), copies: order.copies,
+          hardUpgrade: cover === 'soft' ? upgradeSurcharge(order.package, order.package, order.copies, 'soft', 'hard') : null,
+          // v1.28 — order more copies of this book later (same approved book; other cover = new proof to approve)
+          reorder: ['paid', 'printing', 'shipped', 'delivered'].includes(order.status) && hasStripe() && countryCode(order.ship_country)
+            ? { extra: { soft: extraPrice(order.package, 'soft'), hard: extraPrice(order.package, 'hard') }, shipBase: SHIP_USD.at(shipRegion(countryCode(order.ship_country))), shipTo: [order.ship_city, order.ship_country].filter(Boolean).join(', ') } : null, maxPhotos: pkg.maxPhotos, pages: pkg.pages, packages: Object.fromEntries(Object.entries(PACKAGES).map(([k, p]) => [k, { label: p.label, maxPhotos: p.maxPhotos, pages: p.pages, price: listPrice(k, cover), cover, upgrade: p.maxPhotos > pkg.maxPhotos ? upgradeSurcharge(order.package, k, order.copies, cover, cover) : null }])), copies: order.copies,
           content_at: order.content_at, profile: order.profile || {}, ship: Object.fromEntries(SHIP_KEYS.map(k => [k, order[k] || ''])), submitted_at: order.submitted_at,
           pay: { online: hasStripe(), price: order.price_usd == null ? null : +order.price_usd, shipping: order.shipping_usd == null ? null : +order.shipping_usd,
             paid: +(order.paid_usd || order.deposit_usd || 0), discount: +(order.discount_pct || 0), deposit_paid: !!order.deposit_paid, balance_paid: !!order.balance_paid, due: balanceDue(order) } },
@@ -87,14 +90,14 @@ export default async function handler(req, res) {
         const buf = await readRaw(req);
         const kind = req.query.kind === 'logo' ? 'logo' : 'portrait';
         const url = await savePublic(`orders/${order.ref}/credit-s${s.id}-${Date.now()}.${type === 'image/png' ? 'png' : 'jpg'}`, buf, type);
-        if (s.credit_image) await removePublic(s.credit_image);
         await q('UPDATE shoots SET credit_image=$1, credit_image_kind=$2 WHERE id=$3', [url, kind, s.id]);
+        if (s.credit_image) await removePublic(s.credit_image);
         return res.json({ ok: true, url, kind });
       }
       case 'shoot-image-delete': {
         const s = await ownShoot(body.id); if (!s) return fail(res, 404, 'Shoot not found');
-        if (s.credit_image) await removePublic(s.credit_image);
         await q('UPDATE shoots SET credit_image=NULL, credit_image_kind=NULL WHERE id=$1', [s.id]);
+        if (s.credit_image) await removePublic(s.credit_image);
         return res.json({ ok: true });
       }
       case 'shoot-delete': {

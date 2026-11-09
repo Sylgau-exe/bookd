@@ -167,12 +167,15 @@ function render() {
     <p class="muted">Your BOOKD in four steps. Everything saves as you go, so you can come back to this page any time with the same link.</p>
     ${PAID === 'deposit' ? `<div class="ok">Payment received — your book is reserved. We also emailed you this private link so you can come back any time.</div>` : ''}
     ${PAID === 'balance' ? `<div class="ok">Balance received — thank you! Your book goes to print now.</div>` : ''}
+    ${PAID === 'reorder' ? `<div class="ok">Thank you! Your extra copies are ordered. You will receive an email when they ship.</div>` : ''}
+    ${reorderBox()}
     ${PAID === 'upgrade' ? `<div class="ok">Done — your book is now ${esc(D.order.packageLabel)} ${esc((D.order.coverLabel || '').toLowerCase())}: up to ${D.order.maxPhotos} photos. The difference is added to your balance.</div>` : ''}
     ${D.order.locked && PAID !== 'balance' ? (D.order.pay && D.order.pay.online && !D.order.pay.balance_paid && D.order.pay.due > 0 ? `<div class="ok">Your book is approved. Pay the balance in “Your proof” and we send it to print.</div>` : `<div class="ok">Your book is approved and in production. Thank you!</div>`) : ''}
     <nav class="steps">${names.map(([k, l], i) => `<a href="#${k}" data-step="${k}" class="${step === k ? 'on' : ''} ${done[k] ? 'done' : ''}"><b>0${i + 1}</b>${l}</a>`).join('')}</nav>
     <section id="pane"></section>`;
   $('.steps').onclick = e => { const a = e.target.closest('a[data-step]'); if (!a) return; e.preventDefault(); step = a.dataset.step; render(); };
   ({ about: paneAbout, ship: paneShip, shoots: paneShoots, proof: paneProof })[step]();
+  bindReorder();
 }
 const dis = () => D.order.locked ? 'disabled' : '';
 
@@ -215,6 +218,27 @@ function quotaBox() {
   if (n > max) return `<div class="quota over"><b>${n} photos — your ${esc(D.order.packageLabel)} package includes ${max}.</b><div class="bar"><i style="width:100%"></i></div><div class="small">Please remove ${n - max} photo${n - max > 1 ? 's' : ''} (press ✕ under a photo).${upTxt}</div></div>`;
   if (n === max) return `<div class="quota full"><b>${n} of ${max} photos: your package is full.</b><div class="bar"><i style="width:100%"></i></div><div class="small">To add another photo, remove one first.${upTxt}</div></div>`;
   return `<div class="quota ok"><div><b>${n} of ${max} photos</b> <span class="small muted">· ${esc(D.order.packageLabel)} package · ${max - n} more you can add</span></div><div class="bar"><i style="width:${pct}%"></i></div></div>`;
+}
+// v1.28 — order more copies of the same book later (the design is already done: printing price only)
+function reorderBox() {
+  const R = D.order.reorder; if (!R) return '';
+  return `<div class="card stack" id="reorder" style="margin:14px 0"><h2 style="margin:0">Order more copies</h2>
+    <div class="small muted">The same book you approved — no new design. Pay online, we print and ship to <b>${esc(R.shipTo)}</b>. To ship somewhere else, write to us.</div>
+    <div class="grid2"><label>Copies<input id="ro-n" type="number" min="1" max="50" value="1"></label>
+      <label>Cover<select id="ro-cv"><option value="soft" ${D.order.cover === 'soft' ? 'selected' : ''}>Softcover · $${R.extra.soft} each</option><option value="hard" ${D.order.cover === 'hard' ? 'selected' : ''}>Hardcover · $${R.extra.hard} each</option></select></label></div>
+    <div class="small" id="ro-sum"></div>
+    <div class="row"><button class="btn primary" type="button" id="ro-go">Order and pay</button></div></div>`;
+}
+function bindReorder() {
+  const R = D.order.reorder; if (!R || !$('#ro-go')) return;
+  const calc = () => { const n = Math.max(1, Math.min(50, parseInt($('#ro-n').value, 10) || 1)), cv = $('#ro-cv').value;
+    const book = R.extra[cv] * n, ship = Math.round(R.shipBase * (1 + 0.5 * (n - 1)));
+    $('#ro-sum').innerHTML = `${n} × $${R.extra[cv]} + shipping $${ship} = <b>$${book + ship} USD</b>${cv !== D.order.cover ? '<br><span class="muted">Other cover than your book: we send you a proof of the new cover to approve before printing.</span>' : ''}`; return { n, cv }; };
+  $('#ro-n').oninput = calc; $('#ro-cv').onchange = calc; calc();
+  $('#ro-go').onclick = async () => { const { n, cv } = calc(); const b = $('#ro-go'); b.disabled = true;
+    try { const r = await fetch(`/api/checkout?action=reorder&t=${encodeURIComponent(T)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ copies: n, cover: cv }) });
+      const j = await r.json(); if (!r.ok || !j.url) throw new Error(j.error || 'Payment is not available right now'); location.href = j.url; }
+    catch (e) { toast(e.message); b.disabled = false; } };
 }
 // v1.26 — the binding the customer chose, and the softcover → hardcover upgrade
 function bindingBox() {

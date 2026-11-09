@@ -2,12 +2,14 @@
 //   GET  /api/checkout?action=config                → { enabled, mode, depositPct }
 //   POST /api/checkout?action=deposit {package, cover, copies, lang} → { url }
 //   POST /api/checkout?action=balance&t=TOKEN       → { url }
+//   POST /api/checkout?action=reorder&t=TOKEN {copies, cover} → { url }  (v1.28: more copies of a printed book)
 //   GET  /api/checkout?action=return&session_id=…   → records the payment, redirects to the performer portal
 import { one, ensureSchema, hasDb } from '../lib/db.js';
 import { readJson, fail, siteUrl, handle } from '../lib/http.js';
-import { PACKAGES, priceFor, discountFor, normCover, coverOf, coverLabel } from '../lib/pricing.js';
+import { PACKAGES, priceFor, discountFor, normCover, coverOf, coverLabel, extraPrice, shippingFor } from '../lib/pricing.js';
 import * as stripe from '../lib/stripe.js';
 import { recordPaidSession, balanceDue, portalLink } from '../lib/orders.js';
+import { countryCode } from '../lib/lulu.js';
 export default async function handler(req, res) {
   const action = req.query.action;
   return handle(req, res, async () => {
@@ -43,12 +45,27 @@ export default async function handler(req, res) {
         metadata: { kind: 'balance', order_id: String(o.id), ref: o.ref } });
       return res.json({ ok: true, url: s.url });
     }
+    if (action === 'reorder' && req.method === 'POST') { // v1.28 — more copies of a book already approved and printed
+      const t = String(req.query.t || ''); const o = t.length >= 32 ? await one('SELECT * FROM orders WHERE token=$1', [t]) : null;
+      if (!o) return fail(res, 404, 'Order not found');
+      if (!['paid', 'printing', 'shipped', 'delivered'].includes(o.status)) return fail(res, 400, 'You can order more copies once your book is approved and printed.');
+      const b = await readJson(req);
+      const copies = Math.max(1, Math.min(50, parseInt(b.copies, 10) || 1)), cover = normCover(b.cover) || coverOf(o);
+      const cc = countryCode(o.ship_country); if (!cc) return fail(res, 400, 'We need your shipping country: write to us and we will set it up.');
+      const book = extraPrice(o.package, cover) * copies, shipping = shippingFor(cc, copies);
+      const s = await stripe.createSession({ amountUsd: book + shipping, lang: o.lang, email: o.customer_email,
+        name: `BOOKD ${PACKAGES[o.package]?.label || ''} ${coverLabel(cover)} — ${copies} more cop${copies > 1 ? 'ies' : 'y'} (${o.ref})`,
+        description: `${copies} × $${extraPrice(o.package, cover)} + shipping $${shipping} to ${[o.ship_city, o.ship_country].filter(Boolean).join(', ')}. Same book as ${o.ref}${cover !== coverOf(o) ? ' in the other cover (you approve a proof first)' : ''}.`,
+        successUrl: `${site}/api/checkout?action=return&session_id={CHECKOUT_SESSION_ID}`, cancelUrl: `${portalLink(site, o)}#proof`,
+        metadata: { kind: 'reorder', order_id: String(o.id), ref: o.ref, copies: String(copies), cover, shipping: String(shipping) } });
+      return res.json({ ok: true, url: s.url, book, shipping, total: book + shipping });
+    }
     if (action === 'return') {
       const id = String(req.query.session_id || ''); if (!/^cs_[A-Za-z0-9_]+$/.test(id)) return fail(res, 400, 'Invalid session');
       const s = await stripe.getSession(id);
       const o = await recordPaidSession(site, s);
       res.statusCode = 303;
-      res.setHeader('Location', o ? `${portalLink(site, o)}&paid=${s.metadata?.kind === 'balance' ? 'balance' : 'deposit'}` : `${site}/?payment=pending#contact`);
+      res.setHeader('Location', o ? `${portalLink(site, o)}&paid=${s.metadata?.kind === 'balance' ? 'balance' : s.metadata?.kind === 'reorder' ? 'reorder' : 'deposit'}` : `${site}/?payment=pending#contact`);
       return res.end();
     }
     return fail(res, 404, 'Unknown action');

@@ -223,6 +223,13 @@ function openDialog(html, onSubmit, okLabel = 'Save') {
 function pkgOptions(sel) { return Object.entries(META.packages).map(([k, p]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${p.label} — ${p.pages} pages, ${p.maxPhotos} photos · soft $${p.price} / hard $${p.price + (META.hardSurcharge || 20)}</option>`).join(''); }
 // v1.26 — the binding the CUSTOMER chose (drives the proof, the cover size and the Lulu product)
 const cvBadge = (c) => `<span class="cvb ${c === 'hard' ? 'hard' : 'soft'}" title="Cover chosen by the customer">${c === 'hard' ? 'HARDCOVER' : 'SOFTCOVER'}</span>`;
+// v1.28 — links between an original book and its duplicates / re-orders
+function familyLine(d) {
+  const f = d.family || [], o = d.order; if (!f.length) return '';
+  const lbl = (x) => `<a href="#order/${x.id}">${esc(x.ref)}</a> ${cvBadge(x.cover)} ×${x.copies} <span class="pill s-${x.status}">${statusLabel(x.status)}</span>`;
+  const parent = f.find(x => x.id === o.parent_id), kids = f.filter(x => x.id !== o.parent_id);
+  return `<div class="small" style="margin:4px 0">${parent ? `${o.origin === 'reorder' ? 'More copies of' : 'Duplicate of'} ${lbl(parent)}` : ''}${parent && kids.length ? ' · ' : ''}${kids.length ? `${parent ? 'Also' : 'Copies'}: ${kids.map(lbl).join(' · ')}` : ''}</div>`;
+}
 function coverOptions(sel) { return Object.entries(META.covers || { soft: 'Softcover', hard: 'Hardcover' }).map(([k, l]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${l}${k === 'hard' ? ` (+$${META.hardSurcharge || 20})` : ''}</option>`).join(''); }
 
 /* ---------- orders list ---------- */
@@ -263,6 +270,7 @@ async function viewOrder(id) {
   const kept = d.photos.filter(p => p.keep !== false).length;
   v.innerHTML = `
   <div class="top"><div><div class="eyebrow"><a href="#orders">Orders</a> / ${esc(o.ref)}</div><h1>${esc(o.customer_name || 'Untitled')}</h1>
+    ${familyLine(d)}
     <div class="small muted">${cvBadge(o.cover)} ${esc(pkg.label || o.package)} · ${o.copies} cop${o.copies > 1 ? 'ies' : 'y'} · ${money(o.price_usd)} · created ${when(o.created_at)}${o.submitted_at ? ' · photos submitted ' + when(o.submitted_at) : ''}</div></div>
     <div class="row"><label style="min-width:200px">Status<select id="st">${META.statuses.map(([k, l]) => `<option value="${k}" ${k === o.status ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div></div>
   <div class="sheet">
@@ -320,7 +328,7 @@ async function viewOrder(id) {
         <h3>Printing</h3>
         <div class="grid3"><label>Printer<input name="printer" value="${esc(o.printer)}" placeholder="Lulu, Blurb…"></label><label>Printer order #<input name="printer_order_id" value="${esc(o.printer_order_id)}"></label><label>Tracking #<input name="tracking" value="${esc(o.tracking)}"></label></div>
         <label>Internal notes<textarea name="notes">${esc(o.notes)}</textarea></label>
-        <div class="row" style="justify-content:space-between"><button class="btn primary" type="submit">Save details</button><button class="btn danger" type="button" id="del">Delete order</button></div>
+        <div class="row" style="justify-content:space-between"><button class="btn primary" type="submit">Save details</button><span class="row"><button class="btn" type="button" id="dup" title="Same book (photos, credits, design, address) in a new order">Duplicate…</button><button class="btn danger" type="button" id="del">Delete order</button></span></div>
       </form>
       <section class="card stack">
         <h2>Performer profile</h2>
@@ -351,6 +359,13 @@ async function viewOrder(id) {
     try { await post('order-update', body); toast('Saved'); reload(); } catch (err) { toast(err.message); }
   };
   $('#recalc').onclick = async () => { const f = new FormData($('#details')); await post('order-update', { id, package: f.get('package'), cover: f.get('cover'), copies: f.get('copies'), recalcPrice: true }); toast('Price recalculated'); reload(); };
+  $('#dup').onclick = () => { const other = o.cover === 'hard' ? 'soft' : 'hard', ex = (c) => (META.packages[o.package]?.extra || 0) + (c === 'hard' ? (META.hardExtraSurcharge || 20) : 0);
+    openDialog(`<h2>Duplicate ${esc(o.ref)}</h2><p class="small muted">Creates a new order with the same photos, credits, design and shipping address — nothing to upload again. Price = extra-copy price × copies (the design is already done).</p>
+      <div class="grid2"><label>Cover<select name="cover">${coverOptions(other)}</select></label><label>Copies<input name="copies" type="number" min="1" max="50" value="1"></label></div>
+      <div class="small">Extra-copy price: softcover <b>$${ex('soft')}</b> · hardcover <b>$${ex('hard')}</b>. Same cover as the approved proof → the proof is reused (ready to print). Other cover → build a new proof.</div>
+      ${o.discount_pct ? `<label style="display:flex;flex-direction:row;gap:8px;align-items:center"><input type="checkbox" name="keepDiscount" checked style="width:auto;margin:0"> Keep the private discount (${esc(o.discount_code || '')} −${o.discount_pct}%)</label>` : ''}`,
+      async f => { const r = await post('order-duplicate', { id, cover: f.get('cover'), copies: f.get('copies'), keepDiscount: f.get('keepDiscount') === 'on' });
+        toast(`${r.ref} created${r.proofReused ? ' — approved proof reused' : ' — build its proof'}`); location.hash = 'order/' + r.id; }, 'Duplicate'); };
   $('#del').onclick = () => openDialog(`<h2>Delete ${esc(o.ref)}?</h2><p>This removes the order, its shoots, photos, proof PDFs and timeline, including the stored files. This can’t be undone.</p>`, async () => { await post('order-delete', { id }); toast('Order deleted'); location.hash = 'orders'; }, 'Delete');
   $('#add-note').onclick = async () => { const t = $('#note').value.trim(); if (!t) return; await post('note', { id, text: t }); reload(); };
   $('#build').onclick = async () => {

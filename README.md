@@ -1,4 +1,4 @@
-# BOOKD — v1.27
+# BOOKD — v1.28
 
 Public site (5 languages) + performer portal + admin back office (English).
 
@@ -178,3 +178,13 @@ Test card: **4242 4242 4242 4242**, any future date, any CVC, any postal code. P
 
 ## v1.27 — Restricted live Stripe key
 - A restricted live key (`rk_live_…`) now counts as **live** (admin pill, checkout config). Recommended key for BOOKD: Stripe → Developers → API keys → Create restricted key → "Powering an integration you built", permissions **Checkout Sessions: Write, Customers: Write, PaymentIntents: Read**, everything else None. Paste it in Vercel as `STRIPE_SECRET_KEY`.
+
+## v1.28 — Duplicate a book · customers order more copies later
+- **Admin → order → "Duplicate…"** (next to Delete): new order with the same photos, credits, profile, design and shipping address — nothing to upload again. Choose the cover and copies. Price = extra-copy price × copies (design already done); keep the private discount if the original had one.
+  - Same cover as the approved proof → the approved proof is reused: the new order is **Approved**, ready for "Send to Lulu" once paid.
+  - Other cover → status **In layout**: build a proof (the cover size and Lulu product change) and send it for approval.
+- **Customer page → "Order more copies"** (once the book is approved & paid, printing, shipped or delivered): choose copies and cover, see book + shipping, pay in full with Stripe. A new linked order is created automatically (paid, same cover = ready to print; other cover = proof to approve first) and you get an email.
+- The original keeps its approved build forever, so the customer can come back any time.
+- Order sheet shows the family: "Duplicate of / More copies of BK-…" and links to all copies.
+- Photos are shared between the original and its copies: a file is only deleted from storage when no order uses it any more.
+- Database: new columns `orders.parent_id`, `orders.origin` (created automatically). No new environment variables.

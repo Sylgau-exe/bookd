@@ -12,7 +12,7 @@ import { savePublic, removePublic, hasBlob } from '../../lib/storage.js';
 import * as lulu from '../../lib/lulu.js';
 import { TEMPLATES, templateKey } from '../../lib/templates.js';
 import { ORNAMENTS, ORNAMENT_COLORS, ornamentKey, ornamentColor } from '../../lib/ornaments.js';
-import { createOrder, balanceDue } from '../../lib/orders.js';
+import { createOrder, balanceDue, duplicateOrder } from '../../lib/orders.js';
 import { buildProof, refreshPrintFiles } from '../../lib/proofs.js';
 import { hasStripe, stripeMode } from '../../lib/stripe.js';
 
@@ -31,7 +31,10 @@ async function loadOrder(id) {
   const proofs = await q('SELECT id, version, status, interior_url, cover_url, preview_url, page_count, layout, sent_at, decided_at, created_at FROM proofs WHERE order_id=$1 ORDER BY version DESC', [id]);
   const comments = proofs.length ? await q('SELECT * FROM proof_comments WHERE proof_id = ANY($1::int[]) ORDER BY created_at', [proofs.map(p => p.id)]) : [];
   const events = await q('SELECT * FROM events WHERE order_id=$1 ORDER BY created_at DESC LIMIT 100', [id]);
-  return { order, shoots, photos, proofs, comments, events };
+  // v1.28 — family: the original book and its duplicates / re-orders
+  const family = await q(`SELECT id, ref, status, cover, package, copies, origin, parent_id, created_at FROM orders
+    WHERE id <> $1 AND (parent_id = $1 OR id = $2 OR (parent_id = $2 AND $2 IS NOT NULL)) ORDER BY id`, [id, order.parent_id]);
+  return { order, shoots, photos, proofs, comments, events, family: family.map(f => ({ ...f, cover: coverOf(f) })) };
 }
 export default async function handler(req, res) {
   const action = req.query.action;
@@ -93,6 +96,14 @@ export default async function handler(req, res) {
         if (!body.customer_name || !isEmail(body.customer_email)) return fail(res, 400, 'Customer name and a valid email are required');
         const o = await createOrder(body, who);
         return res.json({ ok: true, id: o.id });
+      }
+      case 'order-duplicate': { // v1.28 — same book in another cover / more copies, without re-uploading anything
+        const src = await one('SELECT * FROM orders WHERE id=$1', [parseInt(body.id, 10)]); if (!src) return fail(res, 404, 'Order not found');
+        const n = await one('SELECT count(*)::int AS n FROM photos WHERE order_id=$1', [src.id]);
+        if (!n.n) return fail(res, 400, 'This order has no photos yet: nothing to duplicate.');
+        const o = await duplicateOrder(src.id, { cover: body.cover, copies: body.copies, origin: 'duplicate', actor: who });
+        if (body.keepDiscount && src.discount_pct) await q('UPDATE orders SET discount_pct=$1, discount_code=$2 WHERE id=$3', [src.discount_pct, src.discount_code, o.id]);
+        return res.json({ ok: true, id: o.id, ref: o.ref, proofReused: o.proofReused });
       }
       case 'order-update': {
         const id = parseInt(body.id, 10); const cur = await one('SELECT * FROM orders WHERE id=$1', [id]);
