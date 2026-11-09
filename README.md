@@ -1,4 +1,4 @@
-# BOOKD — v1.28
+# BOOKD — v1.30
 
 Public site (5 languages) + performer portal + admin back office (English).
 
@@ -188,3 +188,12 @@ Test card: **4242 4242 4242 4242**, any future date, any CVC, any postal code. P
 - Order sheet shows the family: "Duplicate of / More copies of BK-…" and links to all copies.
 - Photos are shared between the original and its copies: a file is only deleted from storage when no order uses it any more.
 - Database: new columns `orders.parent_id`, `orders.origin` (created automatically). No new environment variables.
+
+## v1.29 — The customer can't miss a proof
+- Customer page: when a proof is waiting, the page **opens straight on "Your proof"**; on any other step a banner "Your proof is ready (version N) — Review my proof →" is shown.
+- If the customer already has the page open, it **checks every 45 s** and switches to the proof by itself when you press "Send to customer" (no reload needed).
+- Proof email: clearer ("ready to approve … press APPROVE"); the timeline now says to which address it went, or "EMAIL FAILED — share the link".
+- Page-count warning: only when there are **more photos** than the package allows. A book that runs longer because of credit pages (e.g. 50 photos in 15 shoots = 66 pages) shows an information note instead — everything is printed (≈ $0.23 USD per extra page at Lulu).
+
+## v1.30 — Long street addresses for Lulu
+- Lulu accepts 30 characters per address line. A longer street address is now split automatically over line 1 + line 2 (at a comma or a space), e.g. "1234 avenue Van Horne, appartement 5" → "1234 avenue Van Horne" / "appartement 5". A line break typed by the customer is kept. If even line 2 is over 30 characters, the Lulu panel asks you to shorten it in Order details.

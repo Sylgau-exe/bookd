@@ -140,7 +140,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const T = new URLSearchParams(location.search).get('t') || '';
 const PAID = new URLSearchParams(location.search).get('paid') || '';
 const usd = v => '$' + Number(v || 0).toFixed(2) + ' USD';
-let D = null, step = 'about', selPage = null;
+let D = null, step = 'about', selPage = null, seenProof = '';
 function toast(t) { const el = $('#toast'); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => el.hidden = true, 2600); }
 async function api(action, body, opts = {}) {
   const r = await fetch(`/api/portal/${action}?t=${encodeURIComponent(T)}${opts.query || ''}`, { method: body || opts.raw ? 'POST' : 'GET', headers: opts.headers || { 'Content-Type': 'application/json' }, body: opts.raw || (body ? JSON.stringify(body) : undefined) });
@@ -152,6 +152,9 @@ async function load() {
   try { D = await api('get'); } catch (e) { $('#root').innerHTML = `<div class="center"><div><h2>We can’t open this book</h2><p class="muted">${esc(e.message)}</p></div></div>`; return; }
   $('#ref').textContent = `${D.order.ref} · ${D.order.packageLabel} · up to ${D.order.maxPhotos} photos`;
   if ((location.hash === '#proof' || PAID === 'balance') && D.proof) step = 'proof';
+  // v1.29: a proof waiting for approval opens directly
+  else if (D.proof?.status === 'sent' && !location.hash && !PAID) step = 'proof';
+  seenProof = D.proof ? `${D.proof.version}:${D.proof.status}` : '';
   if (PAID === 'upgrade' || location.hash === '#shoots') step = 'shoots';
   render();
 }
@@ -169,10 +172,12 @@ function render() {
     ${PAID === 'balance' ? `<div class="ok">Balance received — thank you! Your book goes to print now.</div>` : ''}
     ${PAID === 'reorder' ? `<div class="ok">Thank you! Your extra copies are ordered. You will receive an email when they ship.</div>` : ''}
     ${reorderBox()}
+    ${D.proof?.status === 'sent' && !D.order.locked && step !== 'proof' ? `<div class="ok" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span><b>Your proof is ready (version ${D.proof.version}).</b> Flip through it, then approve it or ask for changes.</span><a class="btn primary" href="#proof" id="go-proof">Review my proof →</a></div>` : ''}
     ${PAID === 'upgrade' ? `<div class="ok">Done — your book is now ${esc(D.order.packageLabel)} ${esc((D.order.coverLabel || '').toLowerCase())}: up to ${D.order.maxPhotos} photos. The difference is added to your balance.</div>` : ''}
     ${D.order.locked && PAID !== 'balance' ? (D.order.pay && D.order.pay.online && !D.order.pay.balance_paid && D.order.pay.due > 0 ? `<div class="ok">Your book is approved. Pay the balance in “Your proof” and we send it to print.</div>` : `<div class="ok">Your book is approved and in production. Thank you!</div>`) : ''}
     <nav class="steps">${names.map(([k, l], i) => `<a href="#${k}" data-step="${k}" class="${step === k ? 'on' : ''} ${done[k] ? 'done' : ''}"><b>0${i + 1}</b>${l}</a>`).join('')}</nav>
     <section id="pane"></section>`;
+  const gp = $('#go-proof'); if (gp) gp.onclick = (e) => { e.preventDefault(); step = 'proof'; render(); };
   $('.steps').onclick = e => { const a = e.target.closest('a[data-step]'); if (!a) return; e.preventDefault(); step = a.dataset.step; render(); };
   ({ about: paneAbout, ship: paneShip, shoots: paneShoots, proof: paneProof })[step]();
   bindReorder();
@@ -466,6 +471,12 @@ function paneProof() {
   $('#changes').onclick = () => decide('changes');
 }
 window.addEventListener('hashchange', () => { if (location.hash === '#proof') load(); });
+// v1.29: while this page stays open, check every 45 s whether a new proof arrived (no reload needed)
+setInterval(async () => {
+  if (document.hidden || !D || D.order.locked) return;
+  try { const n = await api('get'); const key = n.proof ? `${n.proof.version}:${n.proof.status}` : '';
+    if (key !== seenProof && n.proof?.status === 'sent') { D = n; seenProof = key; step = 'proof'; render(); toast(`Your proof is ready — version ${n.proof.version}`); } else seenProof = key; } catch {}
+}, 45000);
 load();
 </script>
 </body>

@@ -237,8 +237,8 @@ export default async function handler(req, res) {
         await q(`UPDATE orders SET status='proof_sent', updated_at=now() WHERE id=$1`, [o.id]);
         const url = `${siteUrl(req)}/my/?t=${o.token}#proof`;
         const r = isEmail(o.customer_email) ? await sendMail({ to: o.customer_email, subject: `Your BOOKD proof is ready (${o.ref}, version ${p.version})`,
-          text: `Hello ${o.customer_name || ''},\n\nYour book proof is ready. Flip through it, leave a comment on any page, then approve it or ask for changes:\n\n${url}\n\nNothing is printed until you approve.\n\nBOOKD` }) : { skipped: true };
-        await logEvent(o.id, who, `Proof v${p.version} sent${r.skipped ? ' (email not configured — share the link)' : ' to customer'}`);
+          text: `Hello ${o.customer_name || ''},\n\nYour book proof is ready to approve (version ${p.version}, ${p.page_count} pages).\n\nOpen it here, flip through it, leave a comment on any page, then press APPROVE or "Ask for changes":\n\n${url}\n\nNothing is printed until you approve.\n\nBOOKD` }) : { skipped: true };
+        await logEvent(o.id, who, `Proof v${p.version} sent${r.skipped ? ' (email not configured — share the link)' : r.ok === false ? ' — EMAIL FAILED, share the link' : ` to customer — email sent to ${o.customer_email}`}`);
         return res.json({ ok: true, url });
       }
       case 'comment-resolve': {
