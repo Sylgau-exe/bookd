@@ -21,7 +21,8 @@ import { syncOrder } from '../../lib/shipping.js';
 const token = () => crypto.randomBytes(24).toString('hex');
 const STATUS_KEYS = STATUSES.map(s => s[0]);
 const EDITABLE = ['status', 'customer_name', 'customer_email', 'phone', 'lang', 'package', 'copies', 'price_usd', 'shipping_usd', 'deposit_paid', 'balance_paid',
-  'ship_name', 'ship_address', 'ship_city', 'ship_region', 'ship_postal', 'ship_country', 'printer', 'printer_order_id', 'tracking', 'notes', 'ship_level', 'template', 'ornament', 'ornament_color', 'photo_style', 'cover'];
+  'ship_name', 'ship_address', 'ship_city', 'ship_region', 'ship_postal', 'ship_country', 'printer', 'printer_order_id', 'tracking', 'notes', 'ship_level', 'template', 'ornament', 'ornament_color', 'photo_style', 'cover',
+  'jacket', 'sponsor_name', 'sponsor_note', 'jacket_linen', 'jacket_foil']; // v1.36 dust jacket edition
 
 async function loadOrder(id) {
   const order = await one('SELECT * FROM orders WHERE id=$1', [id]);
@@ -128,6 +129,11 @@ export default async function handler(req, res) {
           if (k === 'ornament_color') v = ornamentColor(v);
           if (k === 'photo_style') v = ['full', 'mix', 'gallery'].includes(v) ? v : 'full';
           if (k === 'cover') { v = normCover(v); if (!v) return fail(res, 400, 'Cover must be soft or hard'); }
+          if (k === 'jacket') v = v === true || v === '1' || v === 'on';
+          if (k === 'jacket_linen') v = lulu.linenKey(v);
+          if (k === 'jacket_foil') v = lulu.foilKey(v);
+          if (k === 'sponsor_name') v = clip(v, 60);
+          if (k === 'sponsor_note') v = clip(v, 300);
           if (typeof v === 'string') v = clip(v, 4000);
           vals.push(v); sets.push(`${k}=$${vals.length}`);
         }
@@ -270,13 +276,17 @@ export default async function handler(req, res) {
         // (cover PDF size and minimum page count differ between softcover and hardcover).
         const cover = coverOf(o), proofCover = (typeof p.layout === 'string' ? JSON.parse(p.layout) : p.layout)?.binding || cover;
         if (proofCover !== cover) return fail(res, 400, `Cover mismatch: the customer chose ${coverLabel(cover).toUpperCase()} but approved proof v${p.version} was built for ${coverLabel(proofCover).toLowerCase()}. Build a new proof and have it approved again.`);
-        const pod = lulu.podFor(cover);
+        // v1.36 — dust jacket edition: the approved proof must have been built as a jacket (and the other way round)
+        const pj = (typeof p.layout === 'string' ? JSON.parse(p.layout) : p.layout)?.jacket || null;
+        if (!!o.jacket !== !!pj) return fail(res, 400, o.jacket ? `Dust jacket is switched on but approved proof v${p.version} was built without a jacket. Build a new proof and have it approved again.` : `Approved proof v${p.version} was built WITH a dust jacket but the dust jacket is switched off on this order. Build a new proof and have it approved again.`);
+        const pod = pj ? lulu.jacketPod(pj.linen, pj.foil) : lulu.podFor(cover);
         const level = lulu.SHIPPING_LEVELS.includes(body.level) ? body.level : (o.ship_level || 'MAIL');
         let qt;
-        try { qt = await lulu.quote({ cover, pages: p.page_count, quantity: o.copies || 1, address, level }); }
+        try { qt = await lulu.quote({ cover, pages: p.page_count, quantity: o.copies || 1, address, level, pod }); }
         catch (e) { return fail(res, 400, e.message); }
         const costTxt = `${qt.total.toFixed(2)} ${qt.currency} incl. tax (books ${qt.books.toFixed(2)} + shipping ${qt.shipping.toFixed(2)} + fee ${qt.fulfillment.toFixed(2)} + tax ${qt.tax.toFixed(2)}, ${level})`;
         if (action === 'printer-quote') return res.json({ ok: true, quote: qt, level, text: costTxt, env: lulu.luluEnv(), cover, pod, luluPromo: (await getSetting('lulu_promo')) || '' });
+        if (pj) return fail(res, 400, 'Dust jacket edition: preview and Lulu price only for now. Ordering a jacket book is not switched on yet (first sample to be validated).');
         // v1.26: before paying Lulu, the admin confirms they checked Lulu promotions (and notes the code used, if any)
         if (!body.promoChecked) return fail(res, 400, 'Tick "I checked Lulu promotions" first (and note the promo code you will use, if any).');
         if (!o.balance_paid && !body.force) return fail(res, 400, `The balance isn't paid yet ($${balanceDue(o).toFixed(2)} USD). The customer pays it from their page after approving; for another payment method, tick "Balance paid" in the order details.`);

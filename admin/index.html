@@ -358,6 +358,13 @@ async function viewOrder(id) {
           <label>Cover <span class="small muted">(customer’s choice)</span><select name="cover">${coverOptions(o.cover)}</select></label></div>
         <div class="grid3"><label>Copies<input name="copies" type="number" min="1" max="50" value="${o.copies}"></label><label>Price (USD)<input name="price_usd" type="number" step="0.01" value="${o.price_usd ?? ''}"></label></div>
         <div class="row"><button class="btn small" type="button" id="recalc">Recalculate price from package + cover + copies</button></div>
+        <!-- v1.36 — dust jacket edition (preview + Lulu price for now) -->
+        <h3>Dust jacket edition <span class="small muted">hardcover only · sponsor block on the front flap</span></h3>
+        <div class="grid3"><label>Dust jacket<select name="jacket"><option value="0" ${o.jacket ? '' : 'selected'}>No</option><option value="1" ${o.jacket ? 'selected' : ''}>Yes — linen hardcover + glossy jacket</option></select></label>
+          <label>Linen under the jacket<select name="jacket_linen">${Object.entries({ B: 'Black', N: 'Navy', G: 'Gray', R: 'Red', T: 'Tan', F: 'Forest green' }).map(([k, l]) => `<option value="${k}" ${(o.jacket_linen || 'B') === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+          <label>Foil on the spine<select name="jacket_foil">${Object.entries({ W: 'White', G: 'Gold', B: 'Black' }).map(([k, l]) => `<option value="${k}" ${(o.jacket_foil || 'W') === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>
+        <div class="grid2"><label>Sponsor name <span class="small muted">(printed until a logo is added)</span><input name="sponsor_name" maxlength="60" value="${esc(o.sponsor_name || '')}" placeholder="M3 Montréal"></label>
+          <label>Sponsor line <span class="small muted">(optional, one or two lines)</span><input name="sponsor_note" maxlength="300" value="${esc(o.sponsor_note || '')}" placeholder="What the sponsor does · website"></label></div>
         <div class="small">${o.stripe_deposit_session ? `<span class="pill s-approved">Stripe ${o.stripe_deposit_session.startsWith('cs_live') ? 'live' : 'TEST'}</span> ` : ''}${o.discount_pct ? `<span class="pill s-changes">Private code ${esc(o.discount_code || '')} −${o.discount_pct}%</span> ` : ''}Paid online: <b>${money(o.paid_usd || 0)}</b>${o.deposit_usd ? ` (deposit ${money(o.deposit_usd)})` : ''} · Balance due: <b>${money(d.balanceDue)}</b>${o.shipping_usd == null ? ' <span class="muted">— set Shipping (USD) so the customer can pay the balance from the portal</span>' : ''}</div>
         <div class="grid3"><label>Shipping (USD)<input name="shipping_usd" type="number" step="0.01" value="${o.shipping_usd ?? ''}"></label>
           <label class="chk" style="align-self:end"><input type="checkbox" name="deposit_paid" ${o.deposit_paid ? 'checked' : ''}> Deposit paid</label>
@@ -396,7 +403,7 @@ async function viewOrder(id) {
   $('#send-portal').onclick = async () => { try { const r = await post('send-portal', { id }); toast(r.emailed ? 'Link emailed to customer' : 'Email not configured — copy the link'); reload(); } catch (e) { toast(e.message); } };
   $('#details').onsubmit = async e => {
     e.preventDefault(); const f = new FormData(e.target), body = { id };
-    for (const k of ['customer_name', 'customer_email', 'package', 'cover', 'copies', 'price_usd', 'shipping_usd', 'ship_name', 'phone', 'ship_address', 'ship_city', 'ship_region', 'ship_postal', 'ship_country', 'printer', 'printer_order_id', 'tracking', 'notes']) body[k] = f.get(k);
+    for (const k of ['customer_name', 'customer_email', 'package', 'cover', 'copies', 'price_usd', 'shipping_usd', 'ship_name', 'phone', 'ship_address', 'ship_city', 'ship_region', 'ship_postal', 'ship_country', 'printer', 'printer_order_id', 'tracking', 'notes', 'jacket', 'jacket_linen', 'jacket_foil', 'sponsor_name', 'sponsor_note']) body[k] = f.get(k);
     body.deposit_paid = f.get('deposit_paid') === 'on'; body.balance_paid = f.get('balance_paid') === 'on';
     try { await post('order-update', body); toast('Saved'); reload(); } catch (err) { toast(err.message); }
   };
@@ -507,7 +514,7 @@ function luluCard(d) {
     ${!L.configured ? '<div class="small muted">Add <b>LULU_CLIENT_KEY</b>, <b>LULU_CLIENT_SECRET</b> and <b>LULU_ENV</b> (sandbox or production) in Vercel → Settings → Environment Variables, then redeploy.</div>' : `
     ${approved && !o.balance_paid ? `<div class="warnbox">Waiting for the customer to pay the balance: <b>${money(d.balanceDue)}</b>. “Send to Lulu” unlocks when it’s paid (or tick “Balance paid” for another payment method).</div>` : ''}
     ${approved && o.balance_paid && !job ? `<div class="small" style="color:var(--good)"><b>Approved & paid — ready to print.</b></div>` : ''}
-    <div class="row"><span class="small">Customer chose</span> ${cvBadge(o.cover)} ${approved ? (mismatch ? `<span class="pill s-changes">✗ proof v${approved.version} was built for ${proofCover === 'hard' ? 'hardcover' : 'softcover'}: build a new proof</span>` : `<span class="pill s-approved">✓ approved proof and Lulu product match</span>`) : ''}</div>
+    <div class="row"><span class="small">Customer chose</span> ${cvBadge(o.cover)} ${o.jacket ? '<span class="pill s-proof_sent">+ DUST JACKET</span> ' : ''}${approved ? (mismatch ? `<span class="pill s-changes">✗ proof v${approved.version} was built for ${proofCover === 'hard' ? 'hardcover' : 'softcover'}: build a new proof</span>` : `<span class="pill s-approved">✓ approved proof and Lulu product match</span>`) : ''}</div>
     <div class="small muted">${approved ? `Prints the <b>approved proof v${approved.version}</b> (${approved.page_count} pages, ${esc(proofCover === 'hard' ? 'hardcover' : 'softcover')}) · ${o.copies} cop${o.copies > 1 ? 'ies' : 'y'} · ships to ${esc([o.ship_city, o.ship_country].filter(Boolean).join(', ') || 'no address yet')}` : 'Waiting for the customer to approve a proof.'}</div>
     <div class="row"><label style="min-width:220px">Shipping<select id="lulu-level">${(L.levels || ['MAIL']).map(l => `<option ${l === lvl ? 'selected' : ''} value="${l}">${l.replace('_', ' ').toLowerCase()}</option>`).join('')}</select></label></div>
     <div class="row"><button class="btn" type="button" id="lulu-quote" ${approved ? '' : 'disabled'}>Get Lulu price</button>
