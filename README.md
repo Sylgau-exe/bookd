@@ -1,4 +1,4 @@
-# BOOKD — v1.34
+# BOOKD — v1.35
 
 Public site (5 languages) + performer portal + admin back office (English).
 
@@ -237,3 +237,10 @@ Before: a shoot with an even number of photos pushed the next credit page to the
   No room on the credit page (many credits + long story): the shoot keeps its pages and the next shoot starts with a title page on the right.
 - `lib/pdf.js` + online proof (`my/index.html`): draw the small photo and the title page.
 - Applies to proofs built from now on; proofs already built or approved are not changed. Books get a little shorter (Leila: 66 → 58 pages).
+
+## v1.35 — Bio photo on the first page
+- A small portrait is printed under the biography (page 1), centred, between the text and the facts.
+- Which photo: the one marked **Bio** (button under each photo, in the admin and on the performer's page; press again to remove),
+  otherwise the first photo of a Headshots shoot, otherwise the first photo of a Beauty shoot, otherwise none.
+- The photo also stays at its place in its shoot. New column `photos.bio_pic`. Applies to proofs built from now on.
+- v1.34 follow-up: the small photo on a credit page is centred.

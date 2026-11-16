@@ -213,6 +213,11 @@ export default async function handler(req, res) {
         if ('keep' in body) { vals.push(!!body.keep); sets.push(`keep=$${vals.length}`); }
         if ('role' in body) { vals.push(body.role === 'cover' ? 'cover' : null); sets.push(`role=$${vals.length}`); }
         if ('position' in body) { vals.push(parseInt(body.position, 10) || 0); sets.push(`position=$${vals.length}`); }
+        if ('bio' in body) { // v1.35 — the photo under the biography: one per book; pressing it again removes the choice
+          const p = await one('SELECT order_id, bio_pic FROM photos WHERE id=$1', [id]); if (!p) return fail(res, 404, 'Photo not found');
+          await q('UPDATE photos SET bio_pic=false WHERE order_id=$1 AND bio_pic', [p.order_id]);
+          vals.push(!p.bio_pic); sets.push(`bio_pic=$${vals.length}`);
+        }
         if (!sets.length) return res.json({ ok: true });
         if (body.role === 'cover') { const p = await one('SELECT order_id FROM photos WHERE id=$1', [id]); await q(`UPDATE photos SET role=NULL WHERE order_id=$1 AND role='cover'`, [p.order_id]); }
         vals.push(id); await q(`UPDATE photos SET ${sets.join(', ')} WHERE id=$${vals.length}`, vals);
