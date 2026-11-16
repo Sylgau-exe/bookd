@@ -1,4 +1,4 @@
-# BOOKD — v1.35
+# BOOKD — v1.36
 
 Public site (5 languages) + performer portal + admin back office (English).
 
@@ -244,3 +244,13 @@ Before: a shoot with an even number of photos pushed the next credit page to the
   otherwise the first photo of a Headshots shoot, otherwise the first photo of a Beauty shoot, otherwise none.
 - The photo also stays at its place in its shoot. New column `photos.bio_pic`. Applies to proofs built from now on.
 - v1.34 follow-up: the small photo on a credit page is centred.
+
+## v1.36 — Dust jacket edition (preview + Lulu price; ordering not switched on yet)
+- Order details → **Dust jacket edition**: Yes/No (hardcover only), linen colour, foil colour, sponsor name and sponsor line.
+- Lulu product: hardcover wrapped in linen with a printed glossy jacket (`0850X1100FCPRELW080CW444G` + linen + foil letters).
+- `lib/pdf.js buildJacket` — the cover file becomes the jacket laid flat: back flap (portrait, contact) | back cover | spine |
+  front cover (same as the hardcover) | front flap (short introduction + "Special edition presented by" sponsor block).
+  Total size from Lulu's cover-dimensions; flaps 3.25 in; spine from Lulu's hardcover table. Fold positions NOT yet checked against
+  Lulu's own template: validate on the first printed sample.
+- **Get Lulu price** works for a jacket book; **Send to Lulu** is blocked for jacket books until the first sample is validated.
+  Still to do before ordering: foil spine text fields in the print job, sponsor logo upload, customer-facing price.
