@@ -1,4 +1,4 @@
-# BOOKD — v1.33
+# BOOKD — v1.34
 
 Public site (5 languages) + performer portal + admin back office (English).
 
@@ -228,3 +228,12 @@ Before: BOOKD only asked Lulu for news when an admin clicked **Refresh status**,
 - Admin: delivery line under the status in the orders list; Lulu panel shows tracking link, estimated shipping/delivery, shipped/delivered dates and "Last check".
 - Performer page: "being printed / on its way / delivered" banner with estimated delivery and **Track my book**.
 - New columns on `orders`: `printer_checked_at`, `ship_eta`, `shipped_at`, `delivered_at`, `ship_mail_at` (added automatically).
+
+## v1.34 — Credit pages always on the left
+Before: a shoot with an even number of photos pushed the next credit page to the right, where it faced the previous shoot's last photo.
+- `lib/layout.js` — every shoot takes an even number of pages (1 credit page + an odd number of photo pages).
+  A shoot with an even number of photo pages gets ONE photo placed small on its credit page, between the credits and the story:
+  a photo too small to print full page if there is one, otherwise the last photo of the shoot (reorder the photos to choose another).
+  No room on the credit page (many credits + long story): the shoot keeps its pages and the next shoot starts with a title page on the right.
+- `lib/pdf.js` + online proof (`my/index.html`): draw the small photo and the title page.
+- Applies to proofs built from now on; proofs already built or approved are not changed. Books get a little shorter (Leila: 66 → 58 pages).
