@@ -39,7 +39,7 @@ export default async function handler(req, res) {
 
     if (action === 'get') {
       const shoots = await q('SELECT id, position, kind, title, credits, story, credit_image, credit_image_kind FROM shoots WHERE order_id=$1 ORDER BY position, id', [order.id]);
-      const photos = (await q('SELECT id, shoot_id, position, url, width, height, low_res, keep, role FROM photos WHERE order_id=$1 ORDER BY shoot_id, position, id', [order.id]))
+      const photos = (await q('SELECT id, shoot_id, position, url, width, height, low_res, keep, role, bio_pic FROM photos WHERE order_id=$1 ORDER BY shoot_id, position, id', [order.id]))
         .map(p => ({ ...p, low_res: isLowRes(p.width, p.height), too_small: isTooSmall(p.width, p.height) }));
       const proof = await one(`SELECT id, version, status, layout, interior_url, preview_url, page_count, sent_at, created_at FROM proofs WHERE order_id=$1 AND status IN ('sent','approved','changes') ORDER BY version DESC LIMIT 1`, [order.id]);
       const comments = proof ? await q('SELECT id, page, body, author, created_at FROM proof_comments WHERE proof_id=$1 ORDER BY created_at', [proof.id]) : [];
@@ -64,7 +64,7 @@ export default async function handler(req, res) {
     }
     if (locked && !['proof-comment'].includes(action)) return fail(res, 403, 'This book is approved and locked. Write to us if you need a change.');
     // remember when the performer last changed something that is printed (to offer "Update my proof")
-    if (['profile', 'shoot-save', 'shoot-delete', 'shoot-move', 'upload', 'photo-register', 'photo-delete', 'photo-cover', 'photo-move', 'shoot-image', 'shoot-image-delete', 'upgrade'].includes(action)
+    if (['profile', 'shoot-save', 'shoot-delete', 'shoot-move', 'upload', 'photo-register', 'photo-delete', 'photo-cover', 'photo-bio', 'photo-move', 'shoot-image', 'shoot-image-delete', 'upgrade'].includes(action)
       && !(action === 'profile' && !body.profile)) await q('UPDATE orders SET content_at=now() WHERE id=$1', [order.id]);
 
     switch (action) {
@@ -145,6 +145,12 @@ export default async function handler(req, res) {
       case 'photo-delete': {
         const p = await one('SELECT * FROM photos WHERE id=$1 AND order_id=$2', [parseInt(body.id, 10), order.id]); if (!p) return fail(res, 404, 'Photo not found');
         await q('DELETE FROM photos WHERE id=$1', [p.id]); await removePublic(p.url); return res.json({ ok: true });
+      }
+      case 'photo-bio': { // v1.35 — the photo shown small under the biography; pressing it again removes the choice
+        const p = await one('SELECT id, bio_pic FROM photos WHERE id=$1 AND order_id=$2', [parseInt(body.id, 10), order.id]); if (!p) return fail(res, 404, 'Photo not found');
+        await q('UPDATE photos SET bio_pic=false WHERE order_id=$1 AND bio_pic', [order.id]);
+        if (!p.bio_pic) await q('UPDATE photos SET bio_pic=true WHERE id=$1', [p.id]);
+        return res.json({ ok: true, on: !p.bio_pic });
       }
       case 'photo-cover': {
         const p = await one('SELECT id FROM photos WHERE id=$1 AND order_id=$2', [parseInt(body.id, 10), order.id]); if (!p) return fail(res, 404, 'Photo not found');
