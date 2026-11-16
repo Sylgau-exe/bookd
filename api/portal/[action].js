@@ -50,6 +50,8 @@ export default async function handler(req, res) {
           // v1.28 — order more copies of this book later (same approved book; other cover = new proof to approve)
           reorder: ['paid', 'printing', 'shipped', 'delivered'].includes(order.status) && hasStripe() && countryCode(order.ship_country)
             ? { extra: { soft: extraPrice(order.package, 'soft'), hard: extraPrice(order.package, 'hard') }, shipBase: SHIP_USD.at(shipRegion(countryCode(order.ship_country))), shipTo: [order.ship_city, order.ship_country].filter(Boolean).join(', ') } : null, maxPhotos: pkg.maxPhotos, pages: pkg.pages, packages: Object.fromEntries(Object.entries(PACKAGES).map(([k, p]) => [k, { label: p.label, maxPhotos: p.maxPhotos, pages: p.pages, price: listPrice(k, cover), cover, upgrade: p.maxPhotos > pkg.maxPhotos ? upgradeSurcharge(order.package, k, order.copies, cover, cover) : null }])), copies: order.copies,
+          // v1.33 — delivery follow-up shown on the performer's page
+          delivery: ['printing', 'shipped', 'delivered'].includes(order.status) ? { tracking: order.tracking || '', eta: order.ship_eta || null, shipped_at: order.shipped_at, delivered_at: order.delivered_at } : null,
           content_at: order.content_at, profile: order.profile || {}, ship: Object.fromEntries(SHIP_KEYS.map(k => [k, order[k] || ''])), submitted_at: order.submitted_at,
           pay: { online: hasStripe(), price: order.price_usd == null ? null : +order.price_usd, shipping: order.shipping_usd == null ? null : +order.shipping_usd,
             paid: +(order.paid_usd || order.deposit_usd || 0), discount: +(order.discount_pct || 0), deposit_paid: !!order.deposit_paid, balance_paid: !!order.balance_paid, due: balanceDue(order) } },

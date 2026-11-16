@@ -186,6 +186,20 @@ const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = v => v == null || v === '' ? '—' : '$' + Number(v).toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' USD';
 const when = d => d ? new Date(d).toLocaleString('en-CA', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+// v1.33 — delivery follow-up (filled automatically from Lulu every hour)
+const dayTxt = iso => new Date(String(iso).slice(0, 10) + 'T12:00:00Z').toLocaleDateString('en-CA', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+const etaRange = (a, b) => !a && !b ? '' : (!a || !b || a === b) ? dayTxt(a || b) : `${dayTxt(a)} – ${dayTxt(b)}`;
+const etaObj = o => { const e = o.ship_eta; if (!e) return null; if (typeof e === 'object') return e; try { return JSON.parse(e); } catch { return null; } };
+const trackUrl = t => (String(t || '').match(/https?:\/\/\S+/) || [''])[0];
+const trackLabel = t => String(t || '').replace(/https?:\/\/\S+/g, '').replace(/\s*\|\s*$/, '').trim();
+const trackHtml = t => { if (!t) return '—'; const u = trackUrl(t), l = trackLabel(t) || 'Track the parcel'; return u ? `${esc(l)} · <a href="${esc(u)}" target="_blank" rel="noopener">Track ↗</a>` : esc(t); };
+function deliveryLine(o) {
+  const e = etaObj(o), arr = e ? etaRange(e.arrival_min, e.arrival_max) : '', u = trackUrl(o.tracking), link = u ? ` · <a href="${esc(u)}" target="_blank" rel="noopener" data-stop>Track ↗</a>` : '';
+  if (o.status === 'delivered') return `Delivered${o.delivered_at ? ' ' + dayTxt(new Date(o.delivered_at).toISOString()) : ''}${link}`;
+  if (o.status === 'shipped') return `${arr ? 'Arrives ' + arr : 'On its way'}${link}`;
+  if (o.status === 'printing') return `${o.printer_status ? esc(o.printer_status.replace(/_/g, ' ').toLowerCase()) : 'at Lulu'}${arr ? ' · est. delivery ' + arr : ''}`;
+  return '';
+}
 let TOKEN = null; try { TOKEN = localStorage.getItem('bookd_admin'); } catch {}
 let META = { statuses: [], packages: {} };
 const statusLabel = k => (META.statuses.find(s => s[0] === k) || [k, k])[1];
@@ -275,9 +289,9 @@ async function viewOrders() {
     <tr class="click" data-id="${o.id}"><td class="mono">${esc(o.ref)}</td><td><b>${esc(o.customer_name)}</b><div class="small muted">${esc(o.customer_email)}</div></td>
     <td>${esc(META.packages[o.package]?.label || o.package)}</td><td>${cvBadge(o.cover)}</td><td class="num">${o.copies}</td><td class="num">${money(o.price_usd)}</td>
     <td class="small">${o.deposit_paid ? 'Deposit ✓' : '<span class="muted">Deposit —</span>'}<br>${o.balance_paid ? 'Balance ✓' : '<span class="muted">Balance —</span>'}</td>
-    <td class="num">${o.photo_count}</td><td><span class="pill s-${o.status}">${statusLabel(o.status)}</span></td><td class="small muted">${when(o.updated_at)}</td></tr>`).join('')}</tbody></table>`
+    <td class="num">${o.photo_count}</td><td><span class="pill s-${o.status}">${statusLabel(o.status)}</span>${deliveryLine(o) ? `<div class="small muted" style="margin-top:3px">${deliveryLine(o)}</div>` : ''}</td><td class="small muted">${when(o.updated_at)}</td></tr>`).join('')}</tbody></table>`
     : `<div class="empty">No orders${filter ? ' with this status' : ' yet'}. Create one with “New order”, or convert a website message.</div>`;
-  $('#list').onclick = e => { const tr = e.target.closest('tr[data-id]'); if (tr) location.hash = 'order/' + tr.dataset.id; };
+  $('#list').onclick = e => { if (e.target.closest('[data-stop]')) return; const tr = e.target.closest('tr[data-id]'); if (tr) location.hash = 'order/' + tr.dataset.id; };
   refreshUnread();
 }
 function newOrder() {
@@ -498,7 +512,11 @@ function luluCard(d) {
       <button class="btn primary" type="button" id="lulu-send" ${approved && !mismatch && o.balance_paid && (!job || ['CANCELED', 'REJECTED', 'ERROR'].includes(o.printer_status)) ? '' : 'disabled'}>Send to Lulu</button>
       ${job ? `<button class="btn" type="button" id="lulu-refresh">Refresh status</button>${['CREATED', 'UNPAID'].includes(o.printer_status) ? '<button class="btn ghost" type="button" id="lulu-cancel">Cancel job</button>' : ''}` : ''}</div>`}
     ${job ? `<dl class="kv"><dt>Print job</dt><dd>${esc(o.printer_order_id)} <span class="muted small">(${esc(o.printer_env || '')})</span></dd><dt>Lulu status</dt><dd><b>${esc(o.printer_status || '—')}</b></dd>
-      <dt>Lulu cost</dt><dd>${esc(o.printer_cost || '—')}</dd><dt>Lulu promo</dt><dd>${o.lulu_promo_checked_at ? (o.lulu_promo ? `<b>${esc(o.lulu_promo)}</b>` : 'checked — none available') : '<span class="muted">not checked</span>'}</dd><dt>Tracking</dt><dd>${esc(o.tracking || '—')}</dd></dl>
+      <dt>Lulu cost</dt><dd>${esc(o.printer_cost || '—')}</dd><dt>Lulu promo</dt><dd>${o.lulu_promo_checked_at ? (o.lulu_promo ? `<b>${esc(o.lulu_promo)}</b>` : 'checked — none available') : '<span class="muted">not checked</span>'}</dd><dt>Tracking</dt><dd>${trackHtml(o.tracking)}</dd>
+      ${(() => { const e = etaObj(o); if (!e) return ''; const d = etaRange(e.dispatch_min, e.dispatch_max), a = etaRange(e.arrival_min, e.arrival_max);
+        return `${d && !o.shipped_at ? `<dt>Est. shipping</dt><dd>${d}</dd>` : ''}${a && o.status !== 'delivered' ? `<dt>Est. delivery</dt><dd><b>${a}</b></dd>` : ''}`; })()}
+      ${o.shipped_at ? `<dt>Shipped</dt><dd>${when(o.shipped_at)}${o.ship_mail_at ? ' · customer emailed' : ''}</dd>` : ''}${o.delivered_at ? `<dt>Delivered</dt><dd><b>${when(o.delivered_at)}</b></dd>` : ''}
+      <dt>Last check</dt><dd class="muted">${o.printer_checked_at ? when(o.printer_checked_at) : 'not yet'} · checked automatically every hour</dd></dl>
       ${['REJECTED', 'ERROR'].includes(o.printer_status) ? `<div class="warnbox"><b>Lulu rejected the files.</b> The reason is in the Timeline below. Once fixed, click “Send to Lulu” again: a new print job is created (the approved proof stays approved).</div>` : ''}
       ${o.printer_status === 'UNPAID' ? `<div class="warnbox">Lulu is waiting for payment. Open <a href="https://developers${o.printer_env === 'production' ? '' : '.sandbox'}.lulu.com/print-jobs" target="_blank" rel="noopener">Lulu → Print Jobs</a> and pay job ${esc(o.printer_order_id)}${o.printer_env === 'production' ? '' : ' with a test card'}.${o.lulu_promo ? ` <b>Apply promo code ${esc(o.lulu_promo)} before paying.</b>` : ''}</div>` : ''}` : ''}
     <div id="lulu-out"></div>

@@ -16,6 +16,7 @@ import { createOrder, balanceDue, duplicateOrder } from '../../lib/orders.js';
 import { buildProof, refreshPrintFiles } from '../../lib/proofs.js';
 import { hasStripe, stripeMode } from '../../lib/stripe.js';
 import { runAssistant, hasAssistant } from '../../lib/assistant.js';
+import { syncOrder } from '../../lib/shipping.js';
 
 const token = () => crypto.randomBytes(24).toString('hex');
 const STATUS_KEYS = STATUSES.map(s => s[0]);
@@ -87,7 +88,7 @@ export default async function handler(req, res) {
       }
       case 'orders': {
         const st = req.query.status;
-        const rows = await q(`SELECT o.id, o.ref, o.status, o.customer_name, o.customer_email, o.package, o.cover, o.copies, o.price_usd, o.deposit_paid, o.balance_paid, o.ship_country, o.updated_at, o.created_at,
+        const rows = await q(`SELECT o.id, o.ref, o.status, o.customer_name, o.customer_email, o.package, o.cover, o.copies, o.price_usd, o.deposit_paid, o.balance_paid, o.ship_country, o.updated_at, o.created_at, o.printer_status, o.tracking, o.ship_eta, o.shipped_at, o.delivered_at,
           (SELECT count(*)::int FROM photos p WHERE p.order_id=o.id) AS photo_count
           FROM orders o ${st && STATUS_KEYS.includes(st) ? 'WHERE o.status=$1' : ''} ORDER BY o.updated_at DESC LIMIT 500`, st && STATUS_KEYS.includes(st) ? [st] : []);
         return res.json({ ok: true, orders: rows.map(r => ({ ...r, cover: coverOf(r) })) });
@@ -145,8 +146,10 @@ export default async function handler(req, res) {
           const tr = body.tracking || cur.tracking;
           await sendMail({ to: cur.customer_email, subject: `Your BOOKD book is on its way (${cur.ref})`,
             text: `Hello ${cur.customer_name || ''},\n\nYour BOOKD book has shipped.${tr ? `\nTracking: ${tr}` : ''}\n\nThank you!\nBOOKD` });
+          await q('UPDATE orders SET ship_mail_at=now(), shipped_at=COALESCE(shipped_at, now()) WHERE id=$1', [id]);
           await logEvent(id, 'system', 'Shipping email sent to customer');
         }
+        if (body.status === 'delivered' && cur.status !== 'delivered') await q('UPDATE orders SET delivered_at=COALESCE(delivered_at, now()), shipped_at=COALESCE(shipped_at, now()) WHERE id=$1', [id]);
         return res.json({ ok: true });
       }
       case 'order-delete': {
@@ -290,27 +293,10 @@ export default async function handler(req, res) {
         await logEvent(o.id, who, `Sent to Lulu${env === 'production' ? '' : ' SANDBOX (test, not printed)'}: print job ${job.id}, ${coverLabel(cover).toUpperCase()} (${pod}), proof v${p.version}, ${o.copies || 1} cop${(o.copies || 1) > 1 ? 'ies' : 'y'}, ${level}. Quote ${costTxt}. Promo checked: ${promo || 'none available'}`);
         return res.json({ ok: true, jobId: job.id, status: job.status?.name, env, text: costTxt, cover, pod, promo });
       }
-      case 'printer-refresh': {
+      case 'printer-refresh': { // v1.33 — same routine as the hourly automatic check (lib/shipping.js)
         const o = await one('SELECT * FROM orders WHERE id=$1', [parseInt(body.id, 10)]); if (!o) return fail(res, 404, 'Order not found');
-        if (!o.printer_order_id || !/^Lulu/.test(o.printer || '')) return fail(res, 400, 'No Lulu print job on this order');
-        if ((o.printer_env || 'sandbox') !== lulu.luluEnv()) return fail(res, 400, `This job was created in Lulu ${o.printer_env}; the site is now set to ${lulu.luluEnv()}.`);
-        let job; try { job = await lulu.getJob(o.printer_order_id); } catch (e) { return fail(res, 400, e.message); }
-        const st = job.status?.name || 'UNKNOWN', tr = lulu.trackingOf(job), trackTxt = tr.map(t => [t.carrier, t.id, t.url].filter(Boolean).join(' ')).join(' | ');
-        const sets = ['printer_status=$1'], vals = [st];
-        if (trackTxt) { vals.push(trackTxt); sets.push(`tracking=$${vals.length}`); }
-        vals.push(o.id); await q(`UPDATE orders SET ${sets.join(', ')}, updated_at=now() WHERE id=$${vals.length}`, vals);
-        const why = lulu.problemsOf(job);
-        if (st !== o.printer_status || (why && st === 'REJECTED')) await logEvent(o.id, 'Lulu', `Print job ${o.printer_order_id}: ${o.printer_status || '—'} → ${st}${job.status?.message ? ' (' + clip(job.status.message, 300) + ')' : ''}${why ? ' — Lulu says: ' + clip(why, 900) : ''}`);
-        if (st === 'SHIPPED' && !['shipped', 'delivered'].includes(o.status)) {
-          await q(`UPDATE orders SET status='shipped', updated_at=now() WHERE id=$1`, [o.id]);
-          await logEvent(o.id, 'system', 'Status: printing → shipped (Lulu)');
-          if (isEmail(o.customer_email)) {
-            await sendMail({ to: o.customer_email, subject: `Your BOOKD book is on its way (${o.ref})`,
-              text: `Hello ${o.customer_name || ''},\n\nYour BOOKD book has shipped.${trackTxt ? `\nTracking: ${trackTxt}` : ''}\n\nThank you!\nBOOKD` });
-            await logEvent(o.id, 'system', 'Shipping email sent to customer');
-          }
-        }
-        return res.json({ ok: true, status: st, message: [job.status?.message, why].filter(Boolean).join(' — '), tracking: trackTxt });
+        let r; try { r = await syncOrder(o, { site: siteUrl(req) }); } catch (e) { return fail(res, 400, e.message); }
+        return res.json({ ok: true, status: r.status, message: r.message, tracking: r.tracking, eta: r.eta });
       }
       case 'printer-cancel': {
         const o = await one('SELECT * FROM orders WHERE id=$1', [parseInt(body.id, 10)]); if (!o) return fail(res, 404, 'Order not found');
