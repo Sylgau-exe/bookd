@@ -1,4 +1,4 @@
-# BOOKD — v1.32
+# BOOKD — v1.33
 
 Public site (5 languages) + performer portal + admin back office (English).
 
@@ -217,3 +217,14 @@ Test card: **4242 4242 4242 4242**, any future date, any CVC, any postal code. P
 - It never pays, approves or deletes. Questions are also allowed after approval (e.g. "when will I get my book?"), but texts can no longer be inserted.
 - Limit: 40 questions per book (Vercel env `CUSTOMER_AI_LIMIT` to change). Count stored in `orders.ai_count` (created automatically).
 - Its knowledge: `lib/customer-guide.js` (plain words, edit after feedback from Yves). Uses the same `ANTHROPIC_API_KEY`; without it the button is hidden.
+
+## v1.33 — Automatic shipping follow-up (Lulu → BOOKD)
+Before: BOOKD only asked Lulu for news when an admin clicked **Refresh status**, so shipped/delivered books stayed on "Printing".
+- `lib/shipping.js` — one routine (`syncOrder`) reads the Lulu print job and saves status, tracking, estimated shipping/delivery dates;
+  moves the order to **Shipped** (one email to the customer, EN/FR, with tracking + estimated delivery) and to **Delivered**.
+- `api/cron/lulu-sync.js` — runs every hour (`crons` in `vercel.json`) on every open print job. Optional env `CRON_SECRET` protects it.
+  Hourly crons need a Vercel **Pro** project; on a Hobby project change the schedule to once a day (`5 12 * * *`).
+- `api/lulu-webhook.js` — Lulu calls it when a job changes status (registered automatically by the first cron run); it only triggers a re-read from Lulu.
+- Admin: delivery line under the status in the orders list; Lulu panel shows tracking link, estimated shipping/delivery, shipped/delivered dates and "Last check".
+- Performer page: "being printed / on its way / delivered" banner with estimated delivery and **Track my book**.
+- New columns on `orders`: `printer_checked_at`, `ship_eta`, `shipped_at`, `delivered_at`, `ship_mail_at` (added automatically).
