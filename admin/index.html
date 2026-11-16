@@ -365,6 +365,7 @@ async function viewOrder(id) {
           <label>Foil on the spine<select name="jacket_foil">${Object.entries({ W: 'White', G: 'Gold', B: 'Black' }).map(([k, l]) => `<option value="${k}" ${(o.jacket_foil || 'W') === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>
         <div class="grid2"><label>Sponsor name <span class="small muted">(printed until a logo is added)</span><input name="sponsor_name" maxlength="60" value="${esc(o.sponsor_name || '')}" placeholder="M3 Montréal"></label>
           <label>Sponsor line <span class="small muted">(optional, one or two lines)</span><input name="sponsor_note" maxlength="300" value="${esc(o.sponsor_note || '')}" placeholder="What the sponsor does · website"></label></div>
+        <label>Sponsor logo <span class="small muted">(PNG or JPG — link or site file, e.g. /images/sponsors/m3-draft.png; replaces the name on the flap)</span><input name="sponsor_logo" maxlength="400" value="${esc(o.sponsor_logo || '')}"></label>
         <div class="small">${o.stripe_deposit_session ? `<span class="pill s-approved">Stripe ${o.stripe_deposit_session.startsWith('cs_live') ? 'live' : 'TEST'}</span> ` : ''}${o.discount_pct ? `<span class="pill s-changes">Private code ${esc(o.discount_code || '')} −${o.discount_pct}%</span> ` : ''}Paid online: <b>${money(o.paid_usd || 0)}</b>${o.deposit_usd ? ` (deposit ${money(o.deposit_usd)})` : ''} · Balance due: <b>${money(d.balanceDue)}</b>${o.shipping_usd == null ? ' <span class="muted">— set Shipping (USD) so the customer can pay the balance from the portal</span>' : ''}</div>
         <div class="grid3"><label>Shipping (USD)<input name="shipping_usd" type="number" step="0.01" value="${o.shipping_usd ?? ''}"></label>
           <label class="chk" style="align-self:end"><input type="checkbox" name="deposit_paid" ${o.deposit_paid ? 'checked' : ''}> Deposit paid</label>
@@ -403,7 +404,7 @@ async function viewOrder(id) {
   $('#send-portal').onclick = async () => { try { const r = await post('send-portal', { id }); toast(r.emailed ? 'Link emailed to customer' : 'Email not configured — copy the link'); reload(); } catch (e) { toast(e.message); } };
   $('#details').onsubmit = async e => {
     e.preventDefault(); const f = new FormData(e.target), body = { id };
-    for (const k of ['customer_name', 'customer_email', 'package', 'cover', 'copies', 'price_usd', 'shipping_usd', 'ship_name', 'phone', 'ship_address', 'ship_city', 'ship_region', 'ship_postal', 'ship_country', 'printer', 'printer_order_id', 'tracking', 'notes', 'jacket', 'jacket_linen', 'jacket_foil', 'sponsor_name', 'sponsor_note']) body[k] = f.get(k);
+    for (const k of ['customer_name', 'customer_email', 'package', 'cover', 'copies', 'price_usd', 'shipping_usd', 'ship_name', 'phone', 'ship_address', 'ship_city', 'ship_region', 'ship_postal', 'ship_country', 'printer', 'printer_order_id', 'tracking', 'notes', 'jacket', 'jacket_linen', 'jacket_foil', 'sponsor_name', 'sponsor_note', 'sponsor_logo']) body[k] = f.get(k);
     body.deposit_paid = f.get('deposit_paid') === 'on'; body.balance_paid = f.get('balance_paid') === 'on';
     try { await post('order-update', body); toast('Saved'); reload(); } catch (err) { toast(err.message); }
   };

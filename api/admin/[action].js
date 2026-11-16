@@ -22,7 +22,7 @@ const token = () => crypto.randomBytes(24).toString('hex');
 const STATUS_KEYS = STATUSES.map(s => s[0]);
 const EDITABLE = ['status', 'customer_name', 'customer_email', 'phone', 'lang', 'package', 'copies', 'price_usd', 'shipping_usd', 'deposit_paid', 'balance_paid',
   'ship_name', 'ship_address', 'ship_city', 'ship_region', 'ship_postal', 'ship_country', 'printer', 'printer_order_id', 'tracking', 'notes', 'ship_level', 'template', 'ornament', 'ornament_color', 'photo_style', 'cover',
-  'jacket', 'sponsor_name', 'sponsor_note', 'jacket_linen', 'jacket_foil']; // v1.36 dust jacket edition
+  'jacket', 'sponsor_name', 'sponsor_note', 'sponsor_logo', 'jacket_linen', 'jacket_foil']; // v1.36 dust jacket edition
 
 async function loadOrder(id) {
   const order = await one('SELECT * FROM orders WHERE id=$1', [id]);
@@ -133,6 +133,7 @@ export default async function handler(req, res) {
           if (k === 'jacket_linen') v = lulu.linenKey(v);
           if (k === 'jacket_foil') v = lulu.foilKey(v);
           if (k === 'sponsor_name') v = clip(v, 60);
+          if (k === 'sponsor_logo') { v = clip(v, 400); if (v && !/^(https:\/\/|\/images\/)[^\s]+\.(png|jpe?g)$/i.test(v)) return fail(res, 400, 'Sponsor logo: a PNG or JPG, as a link (https://…) or a file of the site (/images/…).'); v = v || null; }
           if (k === 'sponsor_note') v = clip(v, 300);
           if (typeof v === 'string') v = clip(v, 4000);
           vals.push(v); sets.push(`${k}=$${vals.length}`);
