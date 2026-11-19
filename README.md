@@ -1,4 +1,4 @@
-# BOOKD — v1.36
+# BOOKD — v1.38
 
 Public site (5 languages) + performer portal + admin back office (English).
 
@@ -254,3 +254,20 @@ Before: a shoot with an even number of photos pushed the next credit page to the
   Lulu's own template: validate on the first printed sample.
 - **Get Lulu price** works for a jacket book; **Send to Lulu** is blocked for jacket books until the first sample is validated.
   Still to do before ordering: foil spine text fields in the print job, sponsor logo upload, customer-facing price.
+
+## v1.37 — No "Send for layout" without a complete shipping address
+- First real customer book (BK-1007) reached layout with a street line that only said "5". From now on **Send for layout**
+  is refused until the shipping address is complete: full name, phone, street (with a street name), city, country,
+  state / province (Canada, USA, Australia, Mexico, Brazil) and postal code (except countries that have none).
+- Performer's page: pressing **Send for layout** with an incomplete address opens step 02 "Shipping" with a message listing
+  what is missing; the Shipping step only shows its check mark, and only moves on, when the address is complete.
+- Server: `lib/address.js shipMissing` — the `submit` action checks again, so the rule cannot be skipped.
+- Books already in layout are not affected (the rule applies when the customer presses Send for layout / Send again).
+
+## v1.38 — A message to the customer with the proof
+- Admin → Proofs → **Send to customer** now opens a box: "Your message to the customer (optional)". The message is put at the
+  top of the proof email and shown above the proof on the customer's page ("A message about this proof"). Empty = the
+  standard email, as before. The message is kept with the proof (`proofs.note`) and can be read again in the admin.
+- The proof email now has a reply-to (the admin inbox), so the customer can simply answer it.
+- A proof cannot be **approved** while the shipping address is incomplete (same rule as v1.37): the customer is told what is
+  missing and sent to step 02.

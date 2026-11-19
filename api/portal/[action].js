@@ -15,6 +15,7 @@ import { runCustomerAssistant, hasAssistant, CUSTOMER_AI_LIMIT } from '../../lib
 const LOCKED = ['approved', 'paid', 'printing', 'shipped', 'delivered', 'cancelled'];
 const PROFILE_KEYS = ['name', 'role', 'bio', 'height', 'languages', 'agency', 'city', 'contact', 'website'];
 const SHIP_KEYS = ['ship_name', 'ship_address', 'ship_city', 'ship_region', 'ship_postal', 'ship_country', 'phone'];
+import { shipMissing } from '../../lib/address.js'; // v1.37 — no book goes to layout without a complete shipping address
 
 export default async function handler(req, res) {
   const action = req.query.action;
@@ -41,7 +42,7 @@ export default async function handler(req, res) {
       const shoots = await q('SELECT id, position, kind, title, credits, story, credit_image, credit_image_kind FROM shoots WHERE order_id=$1 ORDER BY position, id', [order.id]);
       const photos = (await q('SELECT id, shoot_id, position, url, width, height, low_res, keep, role, bio_pic FROM photos WHERE order_id=$1 ORDER BY shoot_id, position, id', [order.id]))
         .map(p => ({ ...p, low_res: isLowRes(p.width, p.height), too_small: isTooSmall(p.width, p.height) }));
-      const proof = await one(`SELECT id, version, status, layout, interior_url, preview_url, page_count, sent_at, created_at FROM proofs WHERE order_id=$1 AND status IN ('sent','approved','changes') ORDER BY version DESC LIMIT 1`, [order.id]);
+      const proof = await one(`SELECT id, version, status, layout, interior_url, preview_url, page_count, sent_at, created_at, note FROM proofs WHERE order_id=$1 AND status IN ('sent','approved','changes') ORDER BY version DESC LIMIT 1`, [order.id]);
       const comments = proof ? await q('SELECT id, page, body, author, created_at FROM proof_comments WHERE proof_id=$1 ORDER BY created_at', [proof.id]) : [];
       const pkg = PACKAGES[order.package] || PACKAGES.signature, cover = coverOf(order);
       return res.json({ ok: true, uploadMode: canClientUpload() ? 'blob' : 'direct', kinds: KIND_LABELS,
@@ -178,6 +179,8 @@ export default async function handler(req, res) {
         if (!n) return fail(res, 400, 'Add at least one photo first');
         const maxP = (PACKAGES[order.package] || PACKAGES.signature).maxPhotos;
         if (n > maxP) return fail(res, 400, `Your package includes ${maxP} photos and you have ${n}. Please remove ${n - maxP} photo(s), or write to us to move up to a bigger package.`);
+        const miss = shipMissing(order, countryCode); // v1.37
+        if (miss.length) return fail(res, 400, `Your shipping address is not complete (${miss.join(', ')}). Please finish step 02 “Shipping”, then send your book again.`);
         await q(`UPDATE orders SET submitted_at=now(), status = CASE WHEN status IN ('new','collecting','changes') THEN 'layout' ELSE status END, updated_at=now() WHERE id=$1`, [order.id]);
         await logEvent(order.id, 'customer', `Photos submitted for layout (${n} photos)`);
         await sendMail({ to: adminInbox(), subject: `[BOOKD] ${order.ref} — photos submitted for layout`, text: `${order.customer_name} sent ${n} photos for layout.\n\nOpen the admin: ${siteUrl(req)}/admin/#order/${order.id}` });
@@ -208,6 +211,7 @@ export default async function handler(req, res) {
         if (!p) return fail(res, 400, 'This proof is no longer open');
         const approve = body.decision === 'approve';
         if (approve && !body.acceptFlagged) return fail(res, 400, 'Please confirm the flagged photos');
+        if (approve) { const miss = shipMissing(order, countryCode); if (miss.length) return fail(res, 400, `Before you approve, please complete your shipping address in step 02 “Shipping” (${miss.join(', ')}). Your book is printed and shipped to that address.`); } // v1.38
         await q(`UPDATE proofs SET status=$1, decided_at=now() WHERE id=$2`, [approve ? 'approved' : 'changes', p.id]);
         await q(`UPDATE orders SET status=$1, updated_at=now() WHERE id=$2`, [approve ? 'approved' : 'changes', order.id]);
         if (clip(body.note)) await q('INSERT INTO proof_comments (proof_id, page, body, author) VALUES ($1,NULL,$2,$3)', [p.id, clip(body.note, 1500), order.customer_name || 'Customer']);
