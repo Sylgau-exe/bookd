@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import { q, one, ensureSchema, logEvent, hasDb, getSetting, setSetting } from '../../lib/db.js';
 import { readJson, fail, clip, isEmail, siteUrl, handle } from '../../lib/http.js';
 import { sign, requireAdmin } from '../../lib/auth.js';
-import { sendMail } from '../../lib/mail.js';
+import { sendMail, adminInbox } from '../../lib/mail.js';
 import { PACKAGES, priceFor, STATUSES, isLowRes, isTooSmall, COVERS, HARD_SURCHARGE, HARD_EXTRA_SURCHARGE, normCover, coverOf, coverLabel } from '../../lib/pricing.js';
 import { buildLayout } from '../../lib/layout.js';
 import { buildPdfs } from '../../lib/pdf.js';
@@ -31,7 +31,7 @@ async function loadOrder(id) {
   const photos = (await q('SELECT * FROM photos WHERE order_id=$1 ORDER BY shoot_id, position, id', [id]))
     .map(p => ({ ...p, low_res: isLowRes(p.width, p.height), too_small: isTooSmall(p.width, p.height) }));
   order.cover = coverOf(order); // v1.26: always explicit (old orders: Prestige = hard, others = soft)
-  const proofs = await q('SELECT id, version, status, interior_url, cover_url, preview_url, page_count, layout, sent_at, decided_at, created_at FROM proofs WHERE order_id=$1 ORDER BY version DESC', [id]);
+  const proofs = await q('SELECT id, version, status, interior_url, cover_url, preview_url, page_count, layout, sent_at, decided_at, created_at, note FROM proofs WHERE order_id=$1 ORDER BY version DESC', [id]);
   const comments = proofs.length ? await q('SELECT * FROM proof_comments WHERE proof_id = ANY($1::int[]) ORDER BY created_at', [proofs.map(p => p.id)]) : [];
   const events = await q('SELECT * FROM events WHERE order_id=$1 ORDER BY created_at DESC LIMIT 100', [id]);
   // v1.28 — family: the original book and its duplicates / re-orders
@@ -252,13 +252,15 @@ export default async function handler(req, res) {
       case 'send-proof': {
         const p = await one('SELECT * FROM proofs WHERE id=$1', [parseInt(body.proofId, 10)]); if (!p) return fail(res, 404, 'Proof not found');
         const o = await one('SELECT * FROM orders WHERE id=$1', [p.order_id]);
-        await q(`UPDATE proofs SET status='sent', sent_at=now() WHERE id=$1`, [p.id]);
+        const note = clip(String(body.note || '').replace(/\r\n/g, '\n').trim(), 6000); // v1.38 — optional message to the customer, shown above the proof and put in the email
+        await q(`UPDATE proofs SET status='sent', sent_at=now(), note=$2 WHERE id=$1`, [p.id, note || null]);
         await q(`UPDATE proofs SET status='superseded' WHERE order_id=$1 AND id<>$2 AND status IN ('draft','sent')`, [o.id, p.id]);
         await q(`UPDATE orders SET status='proof_sent', updated_at=now() WHERE id=$1`, [o.id]);
         const url = `${siteUrl(req)}/my/?t=${o.token}#proof`;
         const r = isEmail(o.customer_email) ? await sendMail({ to: o.customer_email, subject: `Your BOOKD proof is ready (${o.ref}, version ${p.version})`,
-          text: `Hello ${o.customer_name || ''},\n\nYour book proof is ready to approve (version ${p.version}, ${p.page_count} pages).\n\nOpen it here, flip through it, leave a comment on any page, then press APPROVE or "Ask for changes":\n\n${url}\n\nNothing is printed until you approve.\n\nBOOKD` }) : { skipped: true };
-        await logEvent(o.id, who, `Proof v${p.version} sent${r.skipped ? ' (email not configured — share the link)' : r.ok === false ? ' — EMAIL FAILED, share the link' : ` to customer — email sent to ${o.customer_email}`}`);
+          text: note ? `${note}\n\n———\n\nYour proof (version ${p.version}, ${p.page_count} pages) is here. Flip through it, leave a comment on any page, then press APPROVE or "Ask for changes":\n\n${url}\n\nNothing is printed until you approve.\n\nBOOKD`
+            : `Hello ${o.customer_name || ''},\n\nYour book proof is ready to approve (version ${p.version}, ${p.page_count} pages).\n\nOpen it here, flip through it, leave a comment on any page, then press APPROVE or "Ask for changes":\n\n${url}\n\nNothing is printed until you approve.\n\nBOOKD`, replyTo: adminInbox() }) : { skipped: true };
+        await logEvent(o.id, who, `Proof v${p.version} sent${note ? ' with a message' : ''}${r.skipped ? ' (email not configured — share the link)' : r.ok === false ? ' — EMAIL FAILED, share the link' : ` to customer — email sent to ${o.customer_email}`}`);
         return res.json({ ok: true, url });
       }
       case 'comment-resolve': {

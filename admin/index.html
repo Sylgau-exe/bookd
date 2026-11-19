@@ -345,6 +345,7 @@ async function viewOrder(id) {
             ${(p.layout?.warnings || []).map(w => `<div class="warnbox">${esc(w)}</div>`).join('')}
             <div class="row">${p.preview_url ? `<a class="btn" href="${esc(p.preview_url)}" target="_blank" rel="noopener">Book preview (spreads) ↗</a>` : ''}<a class="btn" href="${esc(p.interior_url)}" target="_blank" rel="noopener">Interior PDF ↗</a><a class="btn" href="${esc(p.cover_url)}" target="_blank" rel="noopener">Cover PDF ↗</a>
             ${p.status === 'draft' ? `<button class="btn primary" data-send="${p.id}" type="button">Send to customer</button>` : ''}</div>
+            ${p.note ? `<details class="small" style="margin:6px 0"><summary>Your message sent with this proof</summary><div style="white-space:pre-wrap;margin-top:6px">${esc(p.note)}</div></details>` : ''}
             ${cs.map(c => `<div class="comment ${c.resolved ? 'done' : ''}"><span>${c.page ? `<b>Page ${c.page}:</b> ` : ''}${esc(c.body)} <span class="muted small">— ${esc(c.author)}, ${when(c.created_at)}</span></span><button class="btn ghost small" data-res="${c.id}" data-v="${c.resolved ? 0 : 1}">${c.resolved ? 'Reopen' : 'Done'}</button></div>`).join('')}</div>`;
         }).join('') : '<div class="small muted">No proof yet. When the photos are in, press “Build new proof”: the layout and print PDFs are made automatically.</div>'}
       </section>
@@ -439,7 +440,12 @@ async function viewOrder(id) {
     }
     else if (t.dataset.bio) { await post('photo-update', { id: +t.dataset.bio, bio: true }); toast('Bio photo updated'); reload(); }
     else if (t.dataset.cover) { await post('photo-update', { id: +t.dataset.cover, role: 'cover' }); toast('Cover photo set'); reload(); }
-    else if (t.dataset.send) { t.disabled = true; try { await post('send-proof', { proofId: +t.dataset.send }); toast('Proof sent to customer'); reload(); } catch (err) { toast(err.message); t.disabled = false; } }
+    else if (t.dataset.send) { // v1.38 — ask for an optional message to the customer before sending
+      openDialog(`<h2>Send this proof to the customer</h2>
+        <p class="small muted">They receive an email with the link to their proof. Anything you write here is put at the top of that email and shown above the proof on their page. Write in the customer's language. Leave it empty to send the standard email.</p>
+        <label>Your message to the customer (optional)<textarea name="note" rows="12" maxlength="6000" placeholder="What is missing, what they could change, what you did for them…"></textarea></label>`,
+        async f => { await post('send-proof', { proofId: +t.dataset.send, note: f.get('note') || '' }); toast('Proof sent to customer'); reload(); }, 'Send to customer');
+    }
     else if (t.dataset.res) { await post('comment-resolve', { id: +t.dataset.res, resolved: t.dataset.v === '1' }); reload(); }
   };
 }
