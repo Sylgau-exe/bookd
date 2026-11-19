@@ -15,6 +15,7 @@ import { runCustomerAssistant, hasAssistant, CUSTOMER_AI_LIMIT } from '../../lib
 const LOCKED = ['approved', 'paid', 'printing', 'shipped', 'delivered', 'cancelled'];
 const PROFILE_KEYS = ['name', 'role', 'bio', 'height', 'languages', 'agency', 'city', 'contact', 'website'];
 const SHIP_KEYS = ['ship_name', 'ship_address', 'ship_city', 'ship_region', 'ship_postal', 'ship_country', 'phone'];
+import { shipMissing } from '../../lib/address.js'; // v1.37 — no book goes to layout without a complete shipping address
 
 export default async function handler(req, res) {
   const action = req.query.action;
@@ -178,6 +179,8 @@ export default async function handler(req, res) {
         if (!n) return fail(res, 400, 'Add at least one photo first');
         const maxP = (PACKAGES[order.package] || PACKAGES.signature).maxPhotos;
         if (n > maxP) return fail(res, 400, `Your package includes ${maxP} photos and you have ${n}. Please remove ${n - maxP} photo(s), or write to us to move up to a bigger package.`);
+        const miss = shipMissing(order, countryCode); // v1.37
+        if (miss.length) return fail(res, 400, `Your shipping address is not complete (${miss.join(', ')}). Please finish step 02 “Shipping”, then send your book again.`);
         await q(`UPDATE orders SET submitted_at=now(), status = CASE WHEN status IN ('new','collecting','changes') THEN 'layout' ELSE status END, updated_at=now() WHERE id=$1`, [order.id]);
         await logEvent(order.id, 'customer', `Photos submitted for layout (${n} photos)`);
         await sendMail({ to: adminInbox(), subject: `[BOOKD] ${order.ref} — photos submitted for layout`, text: `${order.customer_name} sent ${n} photos for layout.\n\nOpen the admin: ${siteUrl(req)}/admin/#order/${order.id}` });

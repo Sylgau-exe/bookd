@@ -202,9 +202,20 @@ function deliveryBox() {
   if (st === 'shipped') return wrap(`<b>Your book is on its way.</b>${a ? ` Estimated delivery: <b>${a}</b>.` : ''}${label ? `<br><span class="small">${esc(label)}</span>` : ''}`);
   return wrap(`<b>Your book is being printed.</b>${a ? ` Estimated delivery: <b>${a}</b>.` : ' We email you the tracking link as soon as it ships.'}`);
 }
+// v1.37 — a book cannot be sent for layout without a complete shipping address (same rules as lib/address.js; the server checks again)
+function shipMissing(sh) {
+  const v = k => String((sh && sh[k]) || '').trim(), miss = [];
+  if (v('ship_name').length < 2) miss.push('full name');
+  if (v('phone').replace(/\D/g, '').length < 7) miss.push('phone number');
+  if (v('ship_address').length < 5 || !/\p{L}{2}/u.test(v('ship_address'))) miss.push('street address with the street name');
+  if (v('ship_city').length < 2) miss.push('city');
+  if (v('ship_country').length < 2) miss.push('country');
+  if (v('ship_postal').length < 3 && !/^(hong kong|hk|united arab emirates|uae|ae|qatar|qa)$/i.test(v('ship_country'))) miss.push('postal code');
+  return miss;
+}
 function stepsDone() {
   const pf = D.order.profile, sh = D.order.ship;
-  return { about: !!(pf.name && pf.bio), ship: !!(sh.ship_address && sh.ship_country), shoots: D.photos.length > 0 && !!D.order.submitted_at, proof: D.proof?.status === 'approved' };
+  return { about: !!(pf.name && pf.bio), ship: !shipMissing(sh).length, shoots: D.photos.length > 0 && !!D.order.submitted_at, proof: D.proof?.status === 'approved' };
 }
 function render() {
   const done = stepsDone();
@@ -246,12 +257,13 @@ function paneShip() {
   const s = D.order.ship;
   $('#pane').innerHTML = `<form class="card" id="f">
     <h2>Where should we ship your book?</h2>
+    ${shipMissing(s).length && !D.order.locked ? `<div class="warn" id="ship-warn">We need your complete shipping address before you can send your book for layout. Still missing: <b>${esc(shipMissing(s).join(', '))}</b>.</div>` : ''}
     <div class="grid2"><label>Full name<input name="ship_name" value="${esc(s.ship_name)}" ${dis()}></label><label>Phone (for the courier)<input name="phone" type="tel" value="${esc(s.phone)}" required ${dis()}></label></div>
     <label>Street address<input name="ship_address" value="${esc(s.ship_address)}" ${dis()}></label>
     <div class="grid2"><label>City<input name="ship_city" value="${esc(s.ship_city)}" ${dis()}></label><label>State / province<input name="ship_region" value="${esc(s.ship_region)}" placeholder="e.g. QC, NY" ${dis()}></label></div>
     <div class="grid2"><label>Postal code<input name="ship_postal" value="${esc(s.ship_postal)}" ${dis()}></label><label>Country<input name="ship_country" value="${esc(s.ship_country)}" placeholder="e.g. Canada" ${dis()}></label></div>
     <div class="row"><button class="btn primary" ${dis()}>Save and continue</button></div></form>`;
-  $('#f').onsubmit = async e => { e.preventDefault(); const ship = Object.fromEntries(new FormData(e.target)); await api('profile', { ship }); D.order.ship = { ...D.order.ship, ...ship }; toast('Saved'); step = 'shoots'; render(); };
+  $('#f').onsubmit = async e => { e.preventDefault(); const ship = Object.fromEntries(new FormData(e.target)); await api('profile', { ship }); D.order.ship = { ...D.order.ship, ...ship }; const miss = shipMissing(D.order.ship); if (miss.length) { toast('Saved — still missing: ' + miss.join(', ')); render(); return; } toast('Saved'); step = 'shoots'; render(); };
 }
 /* 03 shoots */
 const CREDIT_DEFAULTS = ['Photographer', 'Makeup', 'Hair', 'Styling', 'Location', 'Date'];
@@ -352,7 +364,7 @@ function paneShoots() {
     hb.disabled = true;
     try { await api('upgrade', { cover: 'hard' }); location.replace(`${location.pathname}?t=${encodeURIComponent(T)}&paid=upgrade#shoots`); }
     catch (e) { toast(e.message); hb.disabled = false; } };
-  $('#submit').onclick = async () => { if (D.photos.length > (D.order.maxPhotos || 0)) { toast(`Please remove ${D.photos.length - D.order.maxPhotos} photo(s) first: your package includes ${D.order.maxPhotos}.`); $('.quota')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; } try { await api('submit', {}); toast('Sent — thank you!'); D.order.submitted_at = new Date().toISOString(); render(); } catch (e) { toast(e.message); } };
+  $('#submit').onclick = async () => { const missShip = shipMissing(D.order.ship); if (missShip.length) { toast('Please complete your shipping address first: ' + missShip.join(', ')); step = 'ship'; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; } if (D.photos.length > (D.order.maxPhotos || 0)) { toast(`Please remove ${D.photos.length - D.order.maxPhotos} photo(s) first: your package includes ${D.order.maxPhotos}.`); $('.quota')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; } try { await api('submit', {}); toast('Sent — thank you!'); D.order.submitted_at = new Date().toISOString(); render(); } catch (e) { toast(e.message); } };
 }
 function shootCard(s) {
   const el = document.createElement('div'); el.className = 'shoot';
